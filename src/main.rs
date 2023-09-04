@@ -3,16 +3,13 @@ use std::env;
 use std::fs::File;
 use std::io::{Error, Read};
 use std::process::exit;
-use std::ptr::null;
 mod input;
 
-// 変数
 #[derive(Clone)]
 struct Variable {
-    name: String, //変数名
-    types: String, //データ型
-    expr: String, //式 
-    value: f64, //値
+    name: String,
+    expr: String,
+    value: f64,
 }
 
 struct Func {
@@ -54,21 +51,11 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
         if lines.find("var").is_some() {
             lines = lines.replacen("var", "", 1);
             let params: Vec<&str> = lines.split("=").collect();
-            if params[1..].join("=").find("'").is_some() {
-                memory.push(Variable {
+            memory.push(Variable {
                 name: params[0].trim().to_string(),
-                types: "string".to_string(),
-                value: 0.0,
-                expr: params[1..].join("=").to_string(),
-            });
-            } else {
-                memory.push(Variable {
-                name: params[0].trim().to_string(),
-                types: "number".to_string(),
                 value: compute(&params[1..].join("=").to_string(), &memory),
                 expr: params[1..].join("=").to_string(),
             });
-            }
         //変数の式の再計算
         } else if lines.find("calc").is_some() {
             let name = lines.replacen("calc", "", 1);
