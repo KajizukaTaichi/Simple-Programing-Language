@@ -1,0 +1,2 @@
+# Simple_Programing_Language
+コンピュータの動作原理を学ぶ新しい教育用プログラミング言語
