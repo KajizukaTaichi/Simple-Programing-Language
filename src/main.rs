@@ -5,6 +5,7 @@ use std::io::{Error, Read};
 use std::process::exit;
 mod input;
 
+//変数のデータ
 #[derive(Clone)]
 struct Variable {
     name: String,
@@ -12,6 +13,7 @@ struct Variable {
     value: f64,
 }
 
+// 関数のデータ
 struct Func {
     name: String,
     code: String,
@@ -1223,7 +1225,7 @@ fn get_file_contents(name: String) -> Result<String, Error> {
 
 fn main() {
     let args = env::args().collect::<Vec<_>>();
-    if args.len() == 3 {
+    if args.len() >= 3 {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
             Ok(func) => {
@@ -1232,6 +1234,13 @@ fn main() {
                 } else if args[1] == "debug" {
                     println!("{}をデバッグします", args[2]);
                     debug(func, &mut Vec::new(), &mut Vec::new());
+                } else if args[1] == "interactive" {
+                    println!("Simple プログラミング言語");
+                    println!("コンピュータの動作原理やロジックを学べます");
+                    println!("(c) 2023 梶塚太智. All rights reserved");
+                    interactive(&mut Vec::new(), &mut Vec::new());
+                } else {
+                    println!("実行モードを正しく指定してください")
                 }
             }
             Err(e) => {
@@ -1239,6 +1248,12 @@ fn main() {
             }
         }
     } else if args.len() == 2 {
+        if args[1] == "interactive" {
+            println!("Simple プログラミング言語");
+            println!("コンピュータの動作原理やロジックを学べます");
+            println!("(c) 2023 梶塚太智. All rights reserved");
+            interactive(&mut Vec::new(), &mut Vec::new());
+        }
         match get_file_contents(args[1].to_string()) {
             Ok(func) => {
                 script(func, &mut Vec::new(), &mut Vec::new());
