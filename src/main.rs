@@ -9,7 +9,7 @@ mod input;
 #[derive(Clone)]
 struct Variable {
     name: String,
-    expr: String,
+    expr: String, // 式
     value: f64,
 }
 
@@ -53,17 +53,19 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
         if lines.find("var").is_some() {
             lines = lines.replacen("var", "", 1);
             let params: Vec<&str> = lines.split("=").collect();
+            let value = compute(&params[1..].join("=").to_string(), memory, name_space);
             memory.push(Variable {
                 name: params[0].trim().to_string(),
-                value: compute(&params[1..].join("=").to_string(), &memory),
+                value,
                 expr: params[1..].join("=").to_string(),
             });
         //変数の式の再計算
         } else if lines.find("calc").is_some() {
             let name = lines.replacen("calc", "", 1);
             for index in 0..memory.len() {
+                let value = compute(&memory[index].to_owned().expr, memory, name_space);
                 if name.trim().to_string() == memory[index].name {
-                    memory[index].value = compute(&memory[index].expr, &memory);
+                    memory[index].value = value;
                     println!("再計算を実行しました");
                     break;
                 }
@@ -100,7 +102,8 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
         } else if lines.find("for").is_some() {
             // ループ回数は式で計算する
             println!("ループ回数を計算します");
-            let index: i32 = compute(&lines.replacen("for", "", 1), memory).round() as i32;
+            let index: i32 =
+                compute(&lines.replacen("for", "", 1), memory, name_space).round() as i32;
             // 繰り返す関数
             let mut code = String::new();
             loop {
@@ -171,7 +174,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 code += &lines;
             }
             println!("ifの条件式を評価します");
-            if compute(&expr, &memory) != 0.0 {
+            if compute(&expr, memory, name_space) != 0.0 {
                 println!("条件が一致したので、実行します");
                 execute(code, memory, name_space);
             } else {
@@ -197,7 +200,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             }
             loop {
                 println!("whileの条件式を評価します");
-                if compute(&expr.to_string(), &memory) == 0.0 {
+                if compute(&expr.to_string(), memory, name_space) == 0.0 {
                     println!("条件が一致しなかったので、ループを脱出します");
                     break;
                 } else {
@@ -210,9 +213,10 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             let name = lines.replacen("input", "", 1);
 
             let inputed = input::input("[入力]> ");
+            let value = compute(&inputed, memory, name_space);
             memory.push(Variable {
                 name: name.trim().to_string(),
-                value: compute(&inputed, &memory),
+                value: value,
                 expr: inputed, //入力値は式として扱われる
             });
         // コメント
@@ -228,7 +232,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                     text += &i.replace("'", "");
                 } else {
                     //文字列以外は式として扱われる
-                    text += &compute(&i.trim().to_string(), memory).to_string();
+                    text += &compute(&i.trim().to_string(), memory, name_space).to_string();
                 }
             }
             println!("[出力]: {text}");
@@ -268,8 +272,8 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             } else {
                 let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                 let temp: i64 = rng.gen_range(
-                    compute(&String::from(params[1]), memory).round() as i64,
-                    compute(&String::from(params[2]), memory).round() as i64,
+                    compute(&String::from(params[1]), memory, name_space).round() as i64,
+                    compute(&String::from(params[2]), memory, name_space).round() as i64,
                 );
                 memory.push(Variable {
                     name: params[0].trim().to_string(),
@@ -289,7 +293,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
 }
 
 //　関数を一括実行
-fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
+fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
     let mut count = 0; // ループカウンタ
@@ -311,11 +315,10 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
         if mode == "for".to_string() {
             if lines == "end for" {
                 // 「end for」でループ終わり
-                for _ in 0..count {
-                    execute(stmt.clone(), memory, name_space);
+                for i in 0..count {
+                    println!("{}回目のループ", i + 1); //ループ実行
+                    execute(code.clone(), memory, name_space);
                 }
-                stmt = String::new();
-                mode = old_mode.clone();
             } else {
                 stmt += lines;
                 stmt += "\n";
@@ -326,7 +329,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 mode = "else".to_string()
             } else if lines == "end if" {
                 println!("ifの条件式を評価します");
-                if compute(&expr, memory) != 0.0 {
+                if compute(&expr, memory, name_space) != 0.0 {
                     println!("条件が一致したので、実行します");
                     execute(stmt.clone(), memory, name_space);
                     stmt = String::new();
@@ -354,7 +357,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
         } else if mode == "else".to_string() {
             if lines == "end if" {
                 println!("ifの条件式を評価します");
-                if compute(&expr, memory) == 0.0 {
+                if compute(&expr, memory, name_space) == 0.0 {
                     println!("条件が一致しなかったので、elseのコードを実行します");
                     execute(else_stmt.clone(), memory, name_space);
                     else_stmt = String::new();
@@ -374,7 +377,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
             if lines == "end while" {
                 loop {
                     println!("whileの条件式を評価します");
-                    if compute(&expr, memory) == 0.0 {
+                    if compute(&expr, memory, name_space) == 0.0 {
                         println!("条件が一致しなかったので、ループを脱出します");
                         stmt = String::new();
                         break;
@@ -391,9 +394,10 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 let new_lines = lines.replacen("var", "", 1); // Create a new String
                 lines = &new_lines;
                 let params: Vec<&str> = lines.split("=").collect();
+                let value = compute(&params[1..].join("=").to_string(), memory, name_space);
                 memory.push(Variable {
                     name: params[0].trim().to_string(),
-                    value: compute(&params[1..].join("=").to_string(), &memory),
+                    value: value,
                     expr: params[1..].join("=").to_string(),
                 });
             } else if lines.find("calc").is_some() {
@@ -401,7 +405,8 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 let name = &new_lines;
                 for index in 0..memory.len() {
                     if name.to_string() == memory[index].name {
-                        memory[index].value = compute(&memory[index].expr, &memory);
+                        memory[index].value =
+                            compute(&memory[index].to_owned().expr, memory, name_space);
                         println!("再計算を実行しました");
                         break;
                     }
@@ -452,7 +457,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 execute(codes.clone(), memory, name_space);
             } else if lines.find("for").is_some() {
                 let new_lines = lines.replacen("for", "", 1); // Create a new String
-                count = compute(&new_lines, memory) as i32;
+                count = compute(&new_lines, memory, name_space) as i32;
                 old_mode = mode;
                 mode = "for".to_string();
             } else if lines.find("if").is_some() {
@@ -470,9 +475,10 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 let name = &new_lines;
 
                 let inputed = input::input("[入力]> ");
+                let value = compute(&inputed, memory, name_space);
                 memory.push(Variable {
                     name: name.trim().to_string(),
-                    value: compute(&inputed, memory),
+                    value: value,
                     expr: inputed,
                 });
             } else if lines.find("print").is_some() {
@@ -485,7 +491,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                         text += &i.replace("'", "");
                     } else {
                         //文字列以外は式として扱われる
-                        text += &compute(&i.trim().to_string(), memory).to_string();
+                        text += &compute(&i.trim().to_string(), memory, name_space).to_string();
                     }
                 }
                 println!("[出力]: {text}");
@@ -507,8 +513,8 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 } else {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(
-                        compute(&String::from(params[1]), memory).round() as i64,
-                        compute(&String::from(params[2]), memory).round() as i64,
+                        compute(&String::from(params[1]), memory, name_space).round() as i64,
+                        compute(&String::from(params[2]), memory, name_space).round() as i64,
                     );
                     memory.push(Variable {
                         name: params[0].trim().to_string(),
@@ -526,6 +532,9 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                         break;
                     }
                 }
+            } else if lines.find("return").is_some() {
+                let return_value = lines.replacen("return", "", 1); // Create a new String
+                return compute(&return_value, memory, name_space);
             } else if lines.find("#").is_some() {
             } else if lines == "exit" {
                 println!("終了します");
@@ -537,10 +546,11 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
             remove_duplicates(memory);
         }
     }
+    return 0.0;
 }
 
 // ファイルに保存されたスクリプトを実行
-fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
+fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
     let mut count = 0; // ループカウンタ
@@ -563,7 +573,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     stmt += "\n";
                 } else {
                     for _ in 0..count {
-                        script(stmt.clone(), memory, name_space);
+                        script(code.clone(), memory, name_space);
                     }
                     stmt = String::new();
                     mode = old_mode.clone();
@@ -586,7 +596,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     stmt += lines;
                     stmt += "\n";
                 } else {
-                    if calculation(&expr, memory) != 0.0 {
+                    if calculation(&expr, memory, name_space) != 0.0 {
                         script(stmt.clone(), memory, name_space);
                         stmt = String::new();
                     } else {
@@ -627,7 +637,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     stmt += lines;
                     stmt += "\n";
                 } else {
-                    if calculation(&expr, memory) == 0.0 {
+                    if calculation(&expr, memory, name_space) == 0.0 {
                         script(else_stmt.clone(), memory, name_space);
                         else_stmt = String::new();
                         stmt = String::new();
@@ -653,7 +663,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     nest_while -= 1;
                 } else {
                     loop {
-                        if calculation(&expr, memory) == 0.0 {
+                        if calculation(&expr, memory, name_space) == 0.0 {
                             stmt = String::new();
                             break;
                         } else {
@@ -673,9 +683,10 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 let new_lines = lines.replacen("var", "", 1); // Create a new String
                 lines = &new_lines;
                 let params: Vec<&str> = lines.split("=").collect();
+                let value = calculation(&params[1..].join("").to_string(), memory, name_space);
                 memory.push(Variable {
                     name: params[0].trim().to_string(),
-                    value: calculation(&params[1..].join("").to_string(), &memory),
+                    value: value,
                     expr: params[1..].join("=").to_string(),
                 });
             } else if lines.find("calc").is_some() {
@@ -683,12 +694,13 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 let name = &new_lines;
                 for index in 0..memory.len() {
                     if name.to_string() == memory[index].name {
-                        memory[index].value = calculation(&memory[index].expr, &memory);
+                        memory[index].value =
+                            calculation(&memory[index].to_owned().expr, memory, name_space);
                         break;
                     }
                 }
             } else if lines.find("func").is_some() {
-                let new_lines = lines.replacen("func", "", 1); // Create a new String
+                let new_lines = lines.trim().replacen("func", "", 1); // Create a new String
                 name = new_lines;
                 mode = "func".to_string();
             } else if lines.find("call").is_some() {
@@ -705,7 +717,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 script(code.clone(), memory, name_space);
             } else if lines.find("for").is_some() {
                 let new_lines = lines.replacen("for", "", 1); // Create a new String
-                count = calculation(&new_lines, memory) as i32;
+                count = calculation(&new_lines, memory, name_space) as i32;
                 old_mode = mode;
                 mode = "for".to_string();
             } else if lines.find("if").is_some() {
@@ -723,9 +735,10 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 let name = &new_lines;
 
                 let inputed = input::input("> ");
+                let value = calculation(&inputed, memory, name_space);
                 memory.push(Variable {
                     name: name.trim().to_string(),
-                    value: calculation(&inputed, memory),
+                    value: value,
                     expr: inputed,
                 });
             } else if lines.find("print").is_some() {
@@ -738,7 +751,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                         text += &i.replace("'", "");
                     } else {
                         //文字列以外は式として扱われる
-                        text += &calculation(&i.trim().to_string(), memory).to_string();
+                        text += &calculation(&i.trim().to_string(), memory, name_space).to_string();
                     }
                 }
                 println!("{text}");
@@ -770,8 +783,8 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 } else {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(
-                        calculation(&String::from(params[1]), memory).round() as i64,
-                        calculation(&String::from(params[2]), memory).round() as i64,
+                        calculation(&String::from(params[1]), memory, name_space).round() as i64,
+                        calculation(&String::from(params[2]), memory, name_space).round() as i64,
                     );
                     memory.push(Variable {
                         name: params[0].trim().to_string(),
@@ -779,6 +792,9 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                         expr: temp.to_string(),
                     });
                 }
+            } else if lines.find("return").is_some() {
+                let return_value = lines.replacen("return", "", 1); // Create a new String
+                return calculation(&return_value, memory, name_space);
             } else if lines == "exit" {
                 exit(0);
             } else if lines == "" {
@@ -788,8 +804,9 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
             remove_duplicates(memory);
         }
     }
+    return 0.0;
 
-    fn calculation(expr: &String, memory: &Vec<Variable>) -> f64 {
+    fn calculation(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
         let mut stack: Vec<f64> = Vec::new();
         let tokens = expr.split(' ');
         for i in tokens {
@@ -804,33 +821,43 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 }
                 Err(_) => match memory.iter().position(|x| x.name == i.to_string()) {
                     Some(index) => {
-                        stack.push(memory[index].value);
+                        stack.push(memory[index].value); //　メモリを参照
                     }
                     None => {
-                        let y = stack.pop().unwrap_or(0.0);
-                        let x = stack.pop().unwrap_or(0.0);
-                        match i {
-                            "+" => stack.push(x + y),
-                            "-" => stack.push(x - y),
-                            "*" => stack.push(x * y),
-                            "/" => stack.push(x / y),
-                            "%" => stack.push(x % y),
-                            "^" => stack.push(x.powf(y)),
-                            "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
-                            "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
-                            "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
-                            ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
-                            "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
-                            "!" => {
-                                stack.push(x);
-                                stack.push(if y == 0.0 { 1.0 } else { 0.0 })
+                        match name_space.iter().position(|x| x.name == i.to_string()) {
+                            Some(index) => {
+                                stack.push(script(
+                                    name_space[index].code.clone(), //　関数呼び出し
+                                    memory,
+                                    name_space,
+                                ));
                             }
-                            _ => {
-                                println!("[ERROR] this operator is invalid \"{}\"", i);
-                                stack.push(x);
-                                stack.push(y);
+                            None => {
+                                let y = stack.pop().unwrap_or(0.0);
+                                let x = stack.pop().unwrap_or(0.0);
+                                match i {
+                                    "+" => stack.push(x + y),
+                                    "-" => stack.push(x - y),
+                                    "*" => stack.push(x * y),
+                                    "/" => stack.push(x / y),
+                                    "%" => stack.push(x % y),
+                                    "^" => stack.push(x.powf(y)),
+                                    "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
+                                    "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
+                                    "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
+                                    ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
+                                    "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
+                                    "!" => {
+                                        stack.push(x);
+                                        stack.push(if y == 0.0 { 1.0 } else { 0.0 })
+                                    }
+                                    _ => {
+                                        stack.push(x);
+                                        stack.push(y);
+                                    }
+                                }
                             }
-                        }
+                        };
                     }
                 },
             };
@@ -839,8 +866,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
         return result;
     }
 }
-
-fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
+fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
     let mut count = 0; // ループカウンタ
@@ -871,7 +897,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 } else {
                     // 「end for」でループ終わり
                     for _ in 0..count {
-                        debug(stmt.clone(), memory, name_space);
+                        debug(code.clone(), memory, name_space);
                     }
                 }
                 stmt = String::new();
@@ -895,7 +921,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                     stmt += "\n";
                 } else {
                     println!("ifの条件式を評価します");
-                    if compute(&expr, memory) != 0.0 {
+                    if compute(&expr, memory, name_space) != 0.0 {
                         println!("条件が一致したので、実行します");
                         debug(stmt.clone(), memory, name_space);
                         stmt = String::new();
@@ -943,7 +969,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                     stmt += "\n";
                 } else {
                     println!("ifの条件式を評価します");
-                    if compute(&expr, memory) == 0.0 {
+                    if compute(&expr, memory, name_space) == 0.0 {
                         println!("条件が一致しなかったので、elseのコードを実行します");
                         debug(else_stmt.clone(), memory, name_space);
                         else_stmt = String::new();
@@ -973,7 +999,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 } else {
                     loop {
                         println!("whileの条件式を評価します");
-                        if compute(&expr, memory) == 0.0 {
+                        if compute(&expr, memory, name_space) == 0.0 {
                             println!("条件が一致しなかったので、ループを脱出します");
                             stmt = String::new();
                             break;
@@ -996,9 +1022,10 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 let new_lines = lines.replacen("var", "", 1); // Create a new String
                 lines = &new_lines;
                 let params: Vec<&str> = lines.split("=").collect();
+                let value = compute(&params[1..].join("=").to_string(), memory, name_space);
                 memory.push(Variable {
                     name: params[0].trim().to_string(),
-                    value: compute(&params[1..].join("=").to_string(), &memory),
+                    value: value,
                     expr: params[1..].join("=").to_string(),
                 });
             } else if lines.find("calc").is_some() {
@@ -1006,7 +1033,8 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 let name = &new_lines;
                 for index in 0..memory.len() {
                     if name.to_string() == memory[index].name {
-                        memory[index].value = compute(&memory[index].expr, &memory);
+                        memory[index].value =
+                            compute(&memory[index].to_owned().expr, memory, name_space);
                         println!("再計算を実行しました");
                         break;
                     }
@@ -1046,7 +1074,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 debug(codes.clone(), memory, name_space);
             } else if lines.find("for").is_some() {
                 let new_lines = lines.replacen("for", "", 1); // Create a new String
-                count = compute(&new_lines, memory) as i32;
+                count = compute(&new_lines, memory, name_space) as i32;
                 old_mode = mode;
                 mode = "for".to_string();
             } else if lines.find("if").is_some() {
@@ -1064,9 +1092,10 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 let name = &new_lines;
 
                 let inputed = input::input("[入力]> ");
+                let value = compute(&inputed, memory, name_space);
                 memory.push(Variable {
                     name: name.trim().to_string(),
-                    value: compute(&inputed, memory),
+                    value: value,
                     expr: inputed,
                 });
             } else if lines.find("print").is_some() {
@@ -1079,7 +1108,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                         text += &i.replace("'", "");
                     } else {
                         //文字列以外は式として扱われる
-                        text += &compute(&i.trim().to_string(), memory).to_string();
+                        text += &compute(&i.trim().to_string(), memory, name_space).to_string();
                     }
                 }
                 println!("[出力]: {text}");
@@ -1112,8 +1141,8 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 } else {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(
-                        compute(&String::from(params[1]), memory).round() as i64,
-                        compute(&String::from(params[2]), memory).round() as i64,
+                        compute(&String::from(params[1]), memory, name_space).round() as i64,
+                        compute(&String::from(params[2]), memory, name_space).round() as i64,
                     );
                     memory.push(Variable {
                         name: params[0].trim().to_string(),
@@ -1121,6 +1150,9 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                         expr: temp.to_string(),
                     });
                 }
+            } else if lines.find("return").is_some() {
+                let return_value = lines.replacen("return", "", 1); // Create a new String
+                return compute(&return_value, memory, name_space);
             } else if lines == "exit" {
                 println!("終了します");
                 exit(0);
@@ -1160,9 +1192,10 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             }
         }
     }
+    return 0.0;
 }
 
-fn compute(expr: &String, memory: &Vec<Variable>) -> f64 {
+fn compute(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stack: Vec<f64> = Vec::new();
     let tokens = expr.split(' ');
     println!("+-- 計算処理 --");
@@ -1182,30 +1215,38 @@ fn compute(expr: &String, memory: &Vec<Variable>) -> f64 {
                     stack.push(memory[index].value);
                 }
                 None => {
-                    let y = stack.pop().unwrap_or(0.0);
-                    let x = stack.pop().unwrap_or(0.0);
-                    match i {
-                        "+" => stack.push(x + y),
-                        "-" => stack.push(x - y),
-                        "*" => stack.push(x * y),
-                        "/" => stack.push(x / y),
-                        "%" => stack.push(x % y),
-                        "^" => stack.push(x.powf(y)),
-                        "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
-                        "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
-                        "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
-                        ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
-                        "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
-                        "!" => {
-                            stack.push(x);
-                            stack.push(if y == 0.0 { 1.0 } else { 0.0 })
+                    match name_space.iter().position(|x| x.name == i.to_string()) {
+                        Some(index) => {
+                            println!("関数{i}を呼び出します");
+                            stack.push(execute(name_space[index].code.clone(), memory, name_space));
                         }
-                        _ => {
-                            println!("[ERROR] this operator is invalid \"{}\"", i);
-                            stack.push(x);
-                            stack.push(y);
+                        None => {
+                            let y = stack.pop().unwrap_or(0.0);
+                            let x = stack.pop().unwrap_or(0.0);
+                            match i {
+                                "+" => stack.push(x + y),
+                                "-" => stack.push(x - y),
+                                "*" => stack.push(x * y),
+                                "/" => stack.push(x / y),
+                                "%" => stack.push(x % y),
+                                "^" => stack.push(x.powf(y)),
+                                "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
+                                "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
+                                "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
+                                ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
+                                "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
+                                "!" => {
+                                    stack.push(x);
+                                    stack.push(if y == 0.0 { 1.0 } else { 0.0 })
+                                }
+                                _ => {
+                                    println!("[ERROR] this operator is invalid \"{}\"", i);
+                                    stack.push(x);
+                                    stack.push(y);
+                                }
+                            }
                         }
-                    }
+                    };
                 }
             },
         };
