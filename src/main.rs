@@ -5,7 +5,7 @@ use std::io::{Error, Read};
 use std::process::exit;
 mod input;
 
-//変数のデータ
+/// 変数のデータ
 #[derive(Clone)]
 struct Variable {
     name: String,
@@ -13,13 +13,13 @@ struct Variable {
     value: f64,
 }
 
-// 関数のデータ
+/// 関数のデータ
 struct Func {
     name: String,
     code: String,
 }
 
-//メモリの重複を削除する
+/// メモリの重複を削除する
 fn remove_duplicates(memory: &mut Vec<Variable>) -> &mut Vec<Variable> {
     let mut seen_names = std::collections::HashMap::new();
     let mut to_remove = Vec::new();
@@ -44,7 +44,7 @@ fn remove_duplicates(memory: &mut Vec<Variable>) -> &mut Vec<Variable> {
     return memory;
 }
 
-// REPLの対話実行
+/// REPLで対話的に実行する
 fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
     loop {
         // 無限ループで「exit」コマンドまで永遠に実行
@@ -121,7 +121,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             }
         // 関数(コマンドの集合体)の定義
         } else if lines.find("func").is_some() {
-            let name = lines.trim().replacen("func", "", 1);
+            let name = lines.trim().replacen("func", "", 1).replace(" ", "");
             let mut code = String::new();
             loop {
                 let lines = input::input("funcブロック>>>");
@@ -292,7 +292,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
     }
 }
 
-//　関数を一括実行
+///　コードを一括実行する
 fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
@@ -549,7 +549,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
     return 0.0;
 }
 
-// ファイルに保存されたスクリプトを実行
+/// ファイルに保存されたスクリプトを実行する
 fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
@@ -700,12 +700,12 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     }
                 }
             } else if lines.find("func").is_some() {
-                let new_lines = lines.trim().replacen("func", "", 1); // Create a new String
-                name = new_lines;
+                let new_lines = lines.trim().replacen("func", "", 1).replace(" ", ""); // Create a new String
+                name = new_lines.replace(" ", "");
                 mode = "func".to_string();
             } else if lines.find("call").is_some() {
                 let new_lines = lines.replacen("call", "", 1); // Create a new String
-                let name = &new_lines;
+                let name = &new_lines.replace(" ", "");
                 let code = match name_space.iter().position(|x| x.name == name.to_string()) {
                     Some(index) => name_space[index].code.clone(),
                     None => {
@@ -866,6 +866,8 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
         return result;
     }
 }
+
+/// ファイルをデバッグする
 fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
@@ -1057,7 +1059,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     }
                 }
             } else if lines.find("func").is_some() {
-                name = lines.trim().replacen("func", "", 1); // Create a new String
+                name = lines.trim().replacen("func", "", 1).replace(" ", ""); // Create a new String
                 mode = "func".to_string();
                 println!("関数{name}を定義します");
             } else if lines.find("call").is_some() {
@@ -1195,6 +1197,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
     return 0.0;
 }
 
+/// 逆ポーランド記法の式を計算する
 fn compute(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stack: Vec<f64> = Vec::new();
     let tokens = expr.split(' ');
@@ -1256,7 +1259,7 @@ fn compute(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>
     return result;
 }
 
-// ファイルを読み込む
+/// ファイルを読み込む
 fn get_file_contents(name: String) -> Result<String, Error> {
     let mut f = File::open(name.trim())?;
     let mut contents = String::new();
@@ -1265,20 +1268,19 @@ fn get_file_contents(name: String) -> Result<String, Error> {
 }
 
 fn main() {
+    let message = "Simple プログラミング言語\nコンピュータの動作原理やロジックを学べます\n(c) 2023 梶塚太智. All rights reserved";
     let args = env::args().collect::<Vec<_>>();
     if args.len() >= 3 {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
             Ok(func) => {
-                if args[1] == "run" {
+                if args[1] == "run" || args[1] == "r" {
                     script(func, &mut Vec::new(), &mut Vec::new());
-                } else if args[1] == "debug" {
+                } else if args[1] == "debug" || args[1] == "d" {
                     println!("{}をデバッグします", args[2]);
                     debug(func, &mut Vec::new(), &mut Vec::new());
-                } else if args[1] == "interactive" {
-                    println!("Simple プログラミング言語");
-                    println!("コンピュータの動作原理やロジックを学べます");
-                    println!("(c) 2023 梶塚太智. All rights reserved");
+                } else if args[1] == "interactive" || args[1] == "i" {
+                    println!("{message}");
                     interactive(&mut Vec::new(), &mut Vec::new());
                 } else {
                     println!("実行モードを正しく指定してください")
@@ -1289,10 +1291,8 @@ fn main() {
             }
         }
     } else if args.len() == 2 {
-        if args[1] == "interactive" {
-            println!("Simple プログラミング言語");
-            println!("コンピュータの動作原理やロジックを学べます");
-            println!("(c) 2023 梶塚太智. All rights reserved");
+        if args[1] == "interactive" || args[1] == "i" {
+            println!("{message}");
             interactive(&mut Vec::new(), &mut Vec::new());
         }
         match get_file_contents(args[1].to_string()) {
@@ -1305,9 +1305,7 @@ fn main() {
         }
     } else {
         //ファイルがない場合はインタラクティブで実行する
-        println!("Simple プログラミング言語");
-        println!("コンピュータの動作原理やロジックを学べます");
-        println!("(c) 2023 梶塚太智. All rights reserved");
+        println!("{message}");
         interactive(&mut Vec::new(), &mut Vec::new());
     }
 }
