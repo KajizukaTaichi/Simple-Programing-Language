@@ -19,8 +19,33 @@ struct Func {
     code: String,
 }
 
-/// メモリの重複を削除する
-fn remove_duplicates(memory: &mut Vec<Variable>) -> &mut Vec<Variable> {
+/// 変数の重複を削除する
+fn remove_duplicates_variable(memory: &mut Vec<Variable>) -> &mut Vec<Variable> {
+    let mut seen_names = std::collections::HashMap::new();
+    let mut to_remove = Vec::new();
+
+    for (index, memory) in memory.iter().enumerate() {
+        if let Some(existing_index) = seen_names.get(&memory.name) {
+            to_remove.push(if existing_index < &index {
+                *existing_index
+            } else {
+                index
+            });
+        } else {
+            seen_names.insert(&memory.name, index);
+        }
+    }
+
+    to_remove.sort(); // Sort indices in ascending order
+
+    for (i, index) in to_remove.iter().enumerate() {
+        memory.remove(index - i); // Adjust for removed items before
+    }
+    return memory;
+}
+
+/// 関数の重複を削除する
+fn remove_duplicates_function(memory: &mut Vec<Func>) -> &mut Vec<Func> {
     let mut seen_names = std::collections::HashMap::new();
     let mut to_remove = Vec::new();
 
@@ -288,7 +313,8 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
         } else {
             println!("コマンドが不正です: {}", lines)
         }
-        remove_duplicates(memory);
+        remove_duplicates_variable(memory);
+        remove_duplicates_function(name_space);
     }
 }
 
@@ -543,7 +569,8 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
             } else {
                 println!("コマンドが不正です: {}", lines)
             }
-            remove_duplicates(memory);
+            remove_duplicates_variable(memory);
+            remove_duplicates_function(name_space);
         }
     }
     return 0.0;
@@ -801,7 +828,8 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
             } else {
                 println!("コマンドが不正です: {}", lines)
             }
-            remove_duplicates(memory);
+            remove_duplicates_variable(memory);
+            remove_duplicates_function(name_space);
         }
     }
     return 0.0;
@@ -1201,7 +1229,8 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     input::input("継続します");
                     break;
                 }
-                remove_duplicates(memory);
+                remove_duplicates_variable(memory);
+                remove_duplicates_function(name_space);
             }
         }
     }
