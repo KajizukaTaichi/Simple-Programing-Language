@@ -1022,8 +1022,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
             println!("+- {number}行: [{lines}]を実行");
             if lines.find("var").is_some() {
                 let new_lines = lines.replacen("var", "", 1); // Create a new String
-                lines = &new_lines;
-                let params: Vec<&str> = lines.split("=").collect();
+                let params: Vec<&str> = new_lines.split("=").collect();
                 let value = compute(&params[1..].join("=").to_string(), memory, name_space);
                 memory.push(Variable {
                     name: params[0].trim().to_string(),
@@ -1162,35 +1161,47 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
             } else {
                 println!("コマンドが不正です: {}", lines)
             }
-            remove_duplicates(memory);
 
-            let menu = input::input("デバッグメニュー>>> ");
-            if menu.find("mem").is_some() {
-                if memory.len() != 0 {
-                    println!("+-- メモリ内の変数 --");
-                    for i in memory.iter() {
-                        println!(
-                            "| name: '{}' - expr: [{}] - value: {}",
-                            i.name, i.expr, i.value
-                        )
+            // デバッグメニューを表示する
+            loop {
+                let menu = input::input("デバッグメニュー>>> ");
+                if menu.find("var").is_some() {
+                    let lim = &menu.replacen("var", "", 1);
+                    let params: Vec<&str> = lim.split("=").collect();
+                    let value = compute(&params[1..].join("=").to_string(), memory, name_space);
+                    memory.push(Variable {
+                        name: params[0].trim().to_string(),
+                        value,
+                        expr: params[1..].join("=").to_string(),
+                    });
+                } else if menu.find("mem").is_some() {
+                    if memory.len() != 0 {
+                        println!("+-- メモリ内の変数 --");
+                        for i in memory.iter() {
+                            println!(
+                                "| name: '{}' - expr: [{}] - value: {}",
+                                i.name, i.expr, i.value
+                            )
+                        }
+                    } else {
+                        println!("変数がありません");
                     }
-                } else {
-                    println!("変数がありません");
-                }
-                if name_space.len() != 0 {
-                    println!("+-- メモリ内の関数 --");
-                    for i in name_space.iter() {
-                        println!("| name: '{}' - len: {}", i.name, i.code.len());
+                    if name_space.len() != 0 {
+                        println!("+-- メモリ内の関数 --");
+                        for i in name_space.iter() {
+                            println!("| name: '{}' - len: {}", i.name, i.code.len());
+                        }
+                    } else {
+                        println!("関数がありません");
                     }
+                } else if menu.find("exit").is_some() {
+                    input::input("デバッグを中断します");
+                    exit(0);
                 } else {
-                    println!("関数がありません");
+                    input::input("継続します");
+                    break;
                 }
-                input::input("継続します");
-            } else if menu.find("exit").is_some() {
-                println!("デバッグを中断します");
-                exit(0);
-            } else {
-                println!("継続します");
+                remove_duplicates(memory);
             }
         }
     }
