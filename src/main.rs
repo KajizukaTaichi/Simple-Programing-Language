@@ -130,41 +130,41 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             let index: i32 =
                 compute(&lines.replacen("for", "", 1), memory, name_space).round() as i32;
             // 繰り返す関数
-            let mut code = String::new();
+            let mut stmt = String::new();
             loop {
                 let lines = input::input("forループ>>> ");
                 if lines == "end for".to_string() {
                     break; //「end for」までループ
                 }
-                code += &lines;
-                code += "\n";
+                stmt += &lines;
+                stmt += "\n";
             }
 
             for i in 0..index {
                 println!("{}回目のループ", i + 1); //ループ実行
-                execute(code.clone(), memory, name_space);
+                execute(stmt.clone(), memory, name_space);
             }
         // 関数(コマンドの集合体)の定義
         } else if lines.find("func").is_some() {
             let name = lines.trim().replacen("func", "", 1).replace(" ", "");
-            let mut code = String::new();
+            let mut stmt = String::new();
             loop {
                 let lines = input::input("funcブロック>>>");
                 if lines == "end func".to_string() {
                     break;
                 }
-                code += &String::from("\n");
-                code += &lines;
+                stmt += &String::from("\n");
+                stmt += &lines;
             }
             name_space.push(Func {
                 name: name.trim().to_string(),
-                code,
+                code: stmt,
             });
         // 関数の呼び出し
         } else if lines.find("call").is_some() {
             lines = lines.replacen("call", "", 1);
             let name = lines.trim();
-            let code = match name_space.iter().position(|x| x.name == name.to_string()) {
+            let stmt = match name_space.iter().position(|x| x.name == name.to_string()) {
                 Some(index) => name_space[index].code.clone(),
                 None => {
                     println!("関数{name}が見つかりません");
@@ -173,11 +173,11 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 }
             };
             println!("関数{name}を呼び出します");
-            execute(code.clone(), memory, name_space);
+            execute(stmt.clone(), memory, name_space);
         // if文
         } else if lines.find("if").is_some() {
             lines = lines.replacen("if", "", 1);
-            let mut code = String::new();
+            let mut stmt = String::new();
             let mut else_code = String::new();
             let expr = lines;
             'a: /* 脱出用 */ loop {
@@ -195,13 +195,13 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 if lines == "end if".to_string() {
                     break 'a;
                 }
-                code += &String::from("\n");
-                code += &lines;
+                stmt += &String::from("\n");
+                stmt += &lines;
             }
             println!("ifの条件式を評価します");
             if compute(&expr, memory, name_space) != 0.0 {
                 println!("条件が一致したので、実行します");
-                execute(code, memory, name_space);
+                execute(stmt, memory, name_space);
             } else {
                 if else_code != "" {
                     // elseブロックがあるか?
@@ -213,15 +213,15 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             }
         // whileループ
         } else if lines.find("while").is_some() {
-            let mut code = String::new(); //条件式
+            let mut stmt = String::new(); //条件式
             let expr = lines.replacen("while", "", 1);
             loop {
                 let lines = input::input("whileループ>>> ");
                 if lines == "end while".to_string() {
                     break;
                 }
-                code += &lines;
-                code += "\n";
+                stmt += &lines;
+                stmt += "\n";
             }
             loop {
                 println!("whileの条件式を評価します");
@@ -230,7 +230,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                     break;
                 } else {
                     println!("条件が一致したので、ループを継続します");
-                    execute(code.clone(), memory, name_space);
+                    execute(stmt.clone(), memory, name_space);
                 }
             }
         // input文(標準入力)
@@ -343,7 +343,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 // 「end for」でループ終わり
                 for i in 0..count {
                     println!("{}回目のループ", i + 1); //ループ実行
-                    execute(code.clone(), memory, name_space);
+                    execute(stmt.clone(), memory, name_space);
                 }
             } else {
                 stmt += lines;
@@ -600,7 +600,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     stmt += "\n";
                 } else {
                     for _ in 0..count {
-                        script(code.clone(), memory, name_space);
+                        script(stmt.clone(), memory, name_space);
                     }
                     stmt = String::new();
                     mode = old_mode.clone();
@@ -927,7 +927,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                 } else {
                     // 「end for」でループ終わり
                     for _ in 0..count {
-                        debug(code.clone(), memory, name_space);
+                        debug(stmt.clone(), memory, name_space);
                     }
                 }
                 stmt = String::new();
