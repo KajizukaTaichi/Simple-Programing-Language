@@ -143,9 +143,14 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             for i in 0..index {
                 println!("{}回目のループ", i + 1); //ループ実行
                 let status = execute(stmt.clone(), memory, name_space);
-                if status == 1.0 {
-                    //状態が1(break)の時はループを抜け出す
-                    break;
+                match status {
+                    Some(i) => {
+                        if i == f64::MAX {
+                            //状態が1(break)の時はループを抜け出す
+                            break;
+                        }
+                    }
+                    None => {}
                 }
             }
         // 関数(コマンドの集合体)の定義
@@ -269,15 +274,15 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             match reference_variable(name.clone(), memory) {
                 Some(index) => {
                     memory.remove(index);
-                    println!("変数を削除しました");
+                    println!("変数{}を削除しました", name);
                     continue;
                 }
                 None => {}
             }
-            match reference_function(name, name_space) {
+            match reference_function(name.clone(), name_space) {
                 Some(index) => {
                     memory.remove(index);
-                    println!("関数を削除しました");
+                    println!("関数{}を削除しました", name);
                     continue;
                 }
                 None => {}
@@ -285,9 +290,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
         } else if lines.find("rand").is_some() {
             lines = lines.replacen("rand", "", 1);
             let params = lines.split(",").collect::<Vec<&str>>();
-            if params.len() < 1 {
-                println!("エラー！変数を指定してください");
-            } else if params.len() < 3 {
+            if params.len() < 3 {
                 let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                 let temp: i64 = rng.gen_range(1, 10);
                 memory.push(Variable {
@@ -295,13 +298,11 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                     value: temp as f64,
                     expr: temp.to_string(),
                 });
-            } else if params.len() < 1 {
-                println!("エラー！引数が多すぎます");
             } else {
                 let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                 let temp: i64 = rng.gen_range(
-                    compute(&String::from(params[1]), memory, name_space).round() as i64,
-                    compute(&String::from(params[2]), memory, name_space).round() as i64,
+                   {println!("最小値を求めています");compute(&String::from(params[1]), memory, name_space).round() as i64},
+                   {println!("最大値を求めています");compute(&String::from(params[2]), memory, name_space).round() as i64},
                 );
                 memory.push(Variable {
                     name: params[0].trim().replace(" ", ""),
@@ -309,6 +310,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                     expr: temp.to_string(),
                 });
             }
+            println!("乱数を生成しました");
         } else if lines == "exit" {
             println!("終了します");
             exit(0);
@@ -322,7 +324,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
 }
 
 ///　コードを一括実行する
-fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
+fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> Option<f64> {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
     let mut count = 0; // ループカウンタ
@@ -339,17 +341,23 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
             continue;
         } // 空白の行を飛ばす
         number += 1; // 進捗メッセージ
-        println!("-- {number}行: [{lines}]を実行");
-        // forモードの場合
+                     // forモードの場合
         if mode == "for".to_string() {
             if lines == "end for" {
                 // 「end for」でループ終わり
                 for i in 0..count {
                     println!("{}回目のループ", i + 1); //ループ実行
                     let status = execute(stmt.clone(), memory, name_space);
-                    if status == 1.0 {
-                        //状態が1(break)の時はループを抜け出す
-                        break;
+                    match status {
+                        Some(i) => {
+                            if i == f64::MAX {
+                                //状態が1(break)の時はループを抜け出す
+                                break;
+                            } else {
+                                return Some(i);
+                            }
+                        }
+                        None => {}
                     }
                 }
             } else {
@@ -365,8 +373,16 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 if compute(&expr, memory, name_space) != 0.0 {
                     println!("条件が一致したので、実行します");
                     let status = execute(stmt.clone(), memory, name_space);
-                    if status == 1.0 {
-                        return 1.0;
+                    match status {
+                        Some(i) => {
+                            if i == f64::MAX {
+                                //状態が1(break)の時はループを抜け出す
+                                break;
+                            } else {
+                                return Some(i);
+                            }
+                        }
+                        None => {}
                     }
                     stmt = String::new();
                 } else {
@@ -396,8 +412,16 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 if compute(&expr, memory, name_space) == 0.0 {
                     println!("条件が一致しなかったので、elseのコードを実行します");
                     let status = execute(else_stmt.clone(), memory, name_space);
-                    if status == 1.0 {
-                        return 1.0;
+                    match status {
+                        Some(i) => {
+                            if i == f64::MAX {
+                                //状態が1(break)の時はループを抜け出す
+                                break;
+                            } else {
+                                return Some(i);
+                            }
+                        }
+                        None => {}
                     }
                     else_stmt = String::new();
                     stmt = String::new();
@@ -405,8 +429,16 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                     println!("条件が一致したので、実行します");
 
                     let status = execute(stmt.clone(), memory, name_space);
-                    if status == 1.0 {
-                        return 1.0;
+                    match status {
+                        Some(i) => {
+                            if i == f64::MAX {
+                                //状態が1(break)の時はループを抜け出す
+                                break;
+                            } else {
+                                return Some(i);
+                            }
+                        }
+                        None => {}
                     }
                     else_stmt = String::new();
                     stmt = String::new();
@@ -426,9 +458,16 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                         break;
                     }
                     let status = execute(stmt.clone(), memory, name_space);
-                    if status == 1.0 {
-                        //状態が1(break)の時はループを抜け出す
-                        break;
+                    match status {
+                        Some(i) => {
+                            if i == f64::MAX {
+                                //状態が1(break)の時はループを抜け出す
+                                break;
+                            } else {
+                                return Some(i);
+                            }
+                        }
+                        None => {}
                     }
                 }
                 mode = old_mode.clone();
@@ -437,6 +476,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 stmt += "\n";
             }
         } else {
+            println!("-- {number}行: [{lines}]を実行");
             if lines.find("var").is_some() {
                 let new_lines = lines.replacen("var", "", 1);
                 lines = &new_lines;
@@ -545,9 +585,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
             } else if lines.find("rand").is_some() {
                 let new_lines = lines.replacen("rand", "", 1);
                 let params = new_lines.split(",").collect::<Vec<&str>>();
-                if params.len() < 1 {
-                    println!("エラー！変数を指定してください");
-                } else if params.len() < 3 {
+                if params.len() < 3 {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(1, 10);
                     memory.push(Variable {
@@ -555,13 +593,11 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
-                } else if params.len() < 1 {
-                    println!("エラー！引数が多すぎます");
                 } else {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(
-                        compute(&String::from(params[1]), memory, name_space).round() as i64,
-                        compute(&String::from(params[2]), memory, name_space).round() as i64,
+                        {println!("最小値を求めています");compute(&String::from(params[1]), memory, name_space).round() as i64},
+                        {println!("最大値を求めています");compute(&String::from(params[2]), memory, name_space).round() as i64},
                     );
                     memory.push(Variable {
                         name: params[0].trim().replace(" ", ""),
@@ -569,13 +605,14 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                         expr: temp.to_string(),
                     });
                 }
+                println!("乱数を生成しました");
             } else if lines.find("del").is_some() {
                 let new_lines = lines.replacen("del", "", 1);
                 let name = &new_lines;
                 match reference_variable(name.clone(), memory) {
                     Some(index) => {
                         memory.remove(index);
-                        println!("変数を削除しました");
+                        println!("変数{}を削除しました", name);
                         continue;
                     }
                     None => {}
@@ -583,16 +620,16 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 match reference_function(name.to_owned(), name_space) {
                     Some(index) => {
                         memory.remove(index);
-                        println!("関数を削除しました");
+                        println!("関数{}を削除しました", name);
                         continue;
                     }
                     None => {}
                 }
             } else if lines.find("return").is_some() {
                 let return_value = lines.replacen("return", "", 1);
-                return compute(&return_value, memory, name_space);
+                return Some(compute(&return_value, memory, name_space));
             } else if lines.find("break").is_some() {
-                return 1.0;
+                return Some(f64::MAX);
             } else if lines.find("#").is_some() {
             } else if lines == "exit" {
                 println!("終了します");
@@ -605,11 +642,11 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
             remove_duplicates_function(name_space);
         }
     }
-    return 0.0;
+    return None;
 }
 
 /// ファイルに保存されたスクリプトを実行する
-fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
+fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> Option<f64> {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
     let mut count = 0; // ループカウンタ
@@ -633,9 +670,16 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 } else {
                     for _ in 0..count {
                         let status = script(stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            //状態が1(break)の時はループを抜け出す
-                            break;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    //状態が1(break)の時はループを抜け出す
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                     }
                     stmt = String::new();
@@ -661,8 +705,15 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 } else {
                     if calculation(&expr, memory, name_space) != 0.0 {
                         let status = script(stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            return 1.0;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                         stmt = String::new();
                     } else {
@@ -705,15 +756,29 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 } else {
                     if calculation(&expr, memory, name_space) == 0.0 {
                         let status = script(else_stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            return 1.0;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                         else_stmt = String::new();
                         stmt = String::new();
                     } else {
                         let status = script(stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            return 1.0;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                         else_stmt = String::new();
                         stmt = String::new();
@@ -740,9 +805,15 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                             break;
                         } else {
                             let status = script(stmt.clone(), memory, name_space);
-                            if status == 1.0 {
-                                //状態が1(break)の時はループを抜け出す
-                                break;
+                            match status {
+                                Some(i) => {
+                                    if i == f64::MAX {
+                                        //状態が1(break)の時はループを抜け出す
+
+                                        break;
+                                    }
+                                }
+                                None => {}
                             }
                         }
                     }
@@ -850,9 +921,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
             } else if lines.find("rand").is_some() {
                 let new_lines = lines.replacen("rand", "", 1);
                 let params = new_lines.split(",").collect::<Vec<&str>>();
-                if params.len() < 1 {
-                    println!("エラー！変数を指定してください");
-                } else if params.len() < 3 {
+                if params.len() < 3 {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(1, 10);
                     memory.push(Variable {
@@ -860,8 +929,6 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
-                } else if params.len() < 1 {
-                    println!("エラー！引数が多すぎます");
                 } else {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(
@@ -876,9 +943,9 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 }
             } else if lines.find("return").is_some() {
                 let return_value = lines.replacen("return", "", 1);
-                return calculation(&return_value, memory, name_space);
+                return Some(calculation(&return_value, memory, name_space));
             } else if lines.find("break").is_some() {
-                return 1.0;
+                return Some(f64::MAX);
             } else if lines == "exit" {
                 exit(0);
             } else if lines == "" {
@@ -889,11 +956,11 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
             remove_duplicates_function(name_space);
         }
     }
-    return 0.0;
+    return None;
 
     fn calculation(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
         let mut stack: Vec<f64> = Vec::new();
-        let tokens = expr.split(' ');
+        let tokens = expr.split_whitespace();
         for i in tokens {
             let i = i.trim();
             if i.len() == 0 {
@@ -932,11 +999,13 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                                     stack.push(memory[i].value);
                                 }
                                 None => match reference_function_quiet(i.to_string(), name_space) {
-                                    Some(i) => stack.push(script(
-                                        name_space[i].code.clone(),
-                                        memory,
-                                        name_space,
-                                    )),
+                                    Some(i) => stack.push(
+                                        match script(name_space[i].code.clone(), memory, name_space)
+                                        {
+                                            Some(i) => i,
+                                            None => 0.0,
+                                        },
+                                    ),
                                     None => {}
                                 },
                             }
@@ -951,7 +1020,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
 }
 
 /// ファイルをデバッグする
-fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
+fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> Option<f64> {
     let mut stmt = String::new(); // ブロックのステートメント
     let mut else_stmt = String::new(); // elseステートメント
     let mut count = 0; // ループカウンタ
@@ -983,9 +1052,16 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     // 「end for」でループ終わり
                     for _ in 0..count {
                         let status = debug(stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            //状態が1(break)の時はループを抜け出す
-                            break;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    //状態が1(break)の時はループを抜け出す
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                     }
                 }
@@ -1013,8 +1089,16 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     if compute(&expr, memory, name_space) != 0.0 {
                         println!("条件が一致したので、実行します");
                         let status = debug(stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            return 1.0;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    //状態が1(break)の時はループを抜け出す
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                         stmt = String::new();
                     } else {
@@ -1064,16 +1148,32 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     if compute(&expr, memory, name_space) == 0.0 {
                         println!("条件が一致しなかったので、elseのコードを実行します");
                         let status = debug(else_stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            return 1.0;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    //状態が1(break)の時はループを抜け出す
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                         else_stmt = String::new();
                         stmt = String::new();
                     } else {
                         println!("条件が一致したので、実行します");
                         let status = debug(stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            return 1.0;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    //状態が1(break)の時はループを抜け出す
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                         else_stmt = String::new();
                         stmt = String::new();
@@ -1103,9 +1203,16 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                             break;
                         }
                         let status = debug(stmt.clone(), memory, name_space);
-                        if status == 1.0 {
-                            //状態が1(break)の時はループを抜け出す
-                            break;
+                        match status {
+                            Some(i) => {
+                                if i == f64::MAX {
+                                    //状態が1(break)の時はループを抜け出す
+                                    break;
+                                } else {
+                                    return Some(i);
+                                }
+                            }
+                            None => {}
                         }
                     }
                 }
@@ -1219,7 +1326,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                 match reference_variable(name.clone(), memory) {
                     Some(index) => {
                         memory.remove(index);
-                        println!("変数を削除しました");
+                        println!("変数{}を削除しました", name);
                         continue;
                     }
                     None => {}
@@ -1227,7 +1334,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                 match reference_function(name.to_owned(), name_space) {
                     Some(index) => {
                         memory.remove(index);
-                        println!("関数を削除しました");
+                        println!("関数{}を削除しました", name);
                         continue;
                     }
                     None => {}
@@ -1236,9 +1343,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
             } else if lines.find("rand").is_some() {
                 let new_lines = lines.replacen("rand", "", 1);
                 let params = new_lines.split(",").collect::<Vec<&str>>();
-                if params.len() < 1 {
-                    println!("エラー！変数を指定してください");
-                } else if params.len() < 3 {
+                if params.len() < 3 {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(1, 10);
                     memory.push(Variable {
@@ -1246,13 +1351,11 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
-                } else if params.len() < 1 {
-                    println!("エラー！引数が多すぎます");
                 } else {
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(
-                        compute(&String::from(params[1]), memory, name_space).round() as i64,
-                        compute(&String::from(params[2]), memory, name_space).round() as i64,
+                        {println!("最小値を求めています");compute(&String::from(params[1]), memory, name_space).round() as i64},
+                        {println!("最大値を求めています");compute(&String::from(params[2]), memory, name_space).round() as i64},
                     );
                     memory.push(Variable {
                         name: params[0].trim().replace(" ", ""),
@@ -1260,11 +1363,12 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                         expr: temp.to_string(),
                     });
                 }
+                println!("乱数を生成しました");
             } else if lines.find("return").is_some() {
                 let return_value = lines.replacen("return", "", 1);
-                return compute(&return_value, memory, name_space);
+                return Some(compute(&return_value, memory, name_space));
             } else if lines.find("break").is_some() {
-                return 1.0;
+                return Some(f64::MAX);
             } else if lines == "exit" {
                 println!("終了します");
                 exit(0);
@@ -1319,11 +1423,12 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
             }
         }
     }
-    return 0.0;
+    return None;
 }
 
 ///　変数の参照
 fn reference_variable(name: String, memory: &mut Vec<Variable>) -> Option<usize> {
+    let name = name.trim().replace(" ", "");
     match memory
         .iter()
         .position(|x| x.name == name.trim().replace(" ", ""))
@@ -1338,6 +1443,7 @@ fn reference_variable(name: String, memory: &mut Vec<Variable>) -> Option<usize>
 
 ///　関数の参照
 fn reference_function(name: String, name_space: &mut Vec<Func>) -> Option<usize> {
+    let name = name.trim().replace(" ", "");
     match name_space
         .iter()
         .position(|x| x.name == name.trim().replace(" ", ""))
@@ -1352,6 +1458,7 @@ fn reference_function(name: String, name_space: &mut Vec<Func>) -> Option<usize>
 
 /// 変数の参照(ログ出力なし)
 fn reference_variable_quiet(name: String, memory: &mut Vec<Variable>) -> Option<usize> {
+    let name = name.trim().replace(" ", "");
     match memory
         .iter()
         .position(|x| x.name == name.trim().replace(" ", ""))
@@ -1363,6 +1470,7 @@ fn reference_variable_quiet(name: String, memory: &mut Vec<Variable>) -> Option<
 
 /// 関数の参照(ログ出力なし)
 fn reference_function_quiet(name: String, name_space: &mut Vec<Func>) -> Option<usize> {
+    let name = name.trim().replace(" ", "");
     match name_space
         .iter()
         .position(|x| x.name == name.trim().replace(" ", ""))
@@ -1375,7 +1483,7 @@ fn reference_function_quiet(name: String, name_space: &mut Vec<Func>) -> Option<
 /// 逆ポーランド記法の式を計算する
 fn compute(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stack: Vec<f64> = Vec::new();
-    let tokens = expr.split(' ');
+    let tokens = expr.split_whitespace();
     println!("+-- 計算処理 --");
     for i in tokens {
         let i = i.trim();
@@ -1418,9 +1526,13 @@ fn compute(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>
                             None => {}
                         }
                         match reference_function_quiet(i.to_string(), name_space) {
-                            Some(i) => {
-                                stack.push(execute(name_space[i].code.clone(), memory, name_space))
-                            }
+                            Some(i) => stack.push({
+                                println!("関数{i}を呼び出します");
+                                match execute(name_space[i].code.clone(), memory, name_space) {
+                                    Some(i) => i,
+                                    None => 0.0,
+                                }
+                            }),
                             None => {}
                         }
                     }
