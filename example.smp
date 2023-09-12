@@ -1,90 +1,48 @@
-# create by rensato
+var true = 1.0
+var false = 0.0
 
-func num_game
-    print'Start!チャンスは10回'
-    var count = 0
+func prime
+    if number 2 <
+        return false
+    end if
 
-    for 10      
-        call input_number
-        var ok = 1
+    if number 4 <
+        return true
+    end if
 
-        if inputed 0 = 
-            call give_up
-            var ok = 0
-        end if
+    if number 2 % 0 = number 3 % 0 = |
+        return false
+    end if
 
-        if inputed max > inputed min < | inputed 0 = ! &
-            print'xは',min,'から',max,'までです'
-            var ok = 0
+    var i = 5
+    var w = 2
+
+    while i i * number 1 - <
+        if number i % 0 =
+            return false
         end if
         
-        if ok
-            call judges
-        end if
+        var i = i w +
+        var w = 6 w -
+    end while
 
-    end for
-    print'時間切れ。正解は',x,'でした'
+    return true
 end func
 
-func judges
-    if inputed x >
-        print'too big!'
-    end if
+print'素数判定プログラム'
+print'Build on Simple programing language'
 
-    if inputed x <
-        print'too small!'
-    end if
+while 1
+    input number
 
-    if inputed x =
-        print count, '回目で正解!おめでとうございます'
+    if number 0 =
+        print'終了します'
         exit
-    end if    
-end func
-
-func input_number
-    var count = count 1 +
-    print count,'回目。数値を入力してください'
-    input inputed
-end func
-
-func give_up
-    print'諦めますか？(1=続ける,0=終わる)'
-    input inputed
-    if inputed 0 =
-        print'正解は',x,'でした'
-        exit
-    else
-        print'続行します'
     end if
-end func
 
-print'数あてゲーム!'
-
-var is_finish = 0
-
-while is_finish 0 = 
-    print'最小値を入力してください'
-    input min
-
-    if min 1 <
-        print'最小値は1以上にしてください'
+    if prime
+        print number,'は素数です'
     else
-        var is_finish = 1
+        print number,'は素数ではありません'
     end if
 end while
-
-var is_finish = 0
-
-while is_finish 0 = 
-    print'最大値を入力してください'
-    input max
-
-    if max min < max min = |
-        print'最大値は最小値より大きくしてください'
-    else
-        var is_finish = 1
-    end if
-end while
-
-rand x, min, max 1 +
-call num_game
