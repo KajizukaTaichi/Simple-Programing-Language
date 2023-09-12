@@ -80,20 +80,20 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
             let params: Vec<&str> = lines.split("=").collect();
             let value = compute(&params[1..].join("=").to_string(), memory, name_space);
             memory.push(Variable {
-                name: params[0].trim().to_string(),
+                name: params[0].trim().replace(" ", ""),
                 value,
                 expr: params[1..].join("=").to_string(),
             });
         //変数の式の再計算
         } else if lines.find("calc").is_some() {
             let name = lines.replacen("calc", "", 1);
-            for index in 0..memory.len() {
-                let value = compute(&memory[index].to_owned().expr, memory, name_space);
-                if name.trim().to_string() == memory[index].name {
+            match reference_variable(name, memory) {
+                Some(index) => {
+                    let value = compute(&memory[index].to_owned().expr, memory, name_space);
                     memory[index].value = value;
                     println!("再計算を実行しました");
-                    break;
                 }
+                None => {}
             }
         // メモリのデータの表示
         } else if lines.find("mem").is_some() {
@@ -142,14 +142,18 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
 
             for i in 0..index {
                 println!("{}回目のループ", i + 1); //ループ実行
-                execute(stmt.clone(), memory, name_space);
+                let status = execute(stmt.clone(), memory, name_space);
+                if status == 1.0 {
+                    //状態が1(break)の時はループを抜け出す
+                    break;
+                }
             }
         // 関数(コマンドの集合体)の定義
         } else if lines.find("func").is_some() {
             let name = lines.trim().replacen("func", "", 1).replace(" ", "");
             let mut stmt = String::new();
             loop {
-                let lines = input::input("funcブロック>>>");
+                let lines = input::input("funcブロック>>> ");
                 if lines == "end func".to_string() {
                     break;
                 }
@@ -163,17 +167,14 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
         // 関数の呼び出し
         } else if lines.find("call").is_some() {
             lines = lines.replacen("call", "", 1);
-            let name = lines.trim();
-            let stmt = match name_space.iter().position(|x| x.name == name.to_string()) {
-                Some(index) => name_space[index].code.clone(),
-                None => {
-                    println!("関数{name}が見つかりません");
-                    "".to_string();
-                    continue;
+            let name = lines.trim().to_string();
+            match reference_function(name.clone(), name_space) {
+                Some(index) => {
+                    println!("関数{name}を呼び出します");
+                    execute(name_space[index].code.clone(), memory, name_space);
                 }
-            };
-            println!("関数{name}を呼び出します");
-            execute(stmt.clone(), memory, name_space);
+                None => {}
+            }
         // if文
         } else if lines.find("if").is_some() {
             lines = lines.replacen("if", "", 1);
@@ -265,19 +266,21 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
         } else if lines.find("del").is_some() {
             let name = lines.replacen("del", "", 1);
             // 変数の参照
-            for index in 0..memory.len() {
-                if name.to_string().trim() == memory[index].name {
+            match reference_variable(name.clone(), memory) {
+                Some(index) => {
                     memory.remove(index);
                     println!("変数を削除しました");
-                    break;
+                    continue;
                 }
+                None => {}
             }
-            for index in 0..name_space.len() {
-                if name.to_string().trim() == name_space[index].name {
-                    name_space.remove(index);
+            match reference_function(name, name_space) {
+                Some(index) => {
+                    memory.remove(index);
                     println!("関数を削除しました");
-                    break;
+                    continue;
                 }
+                None => {}
             }
         } else if lines.find("rand").is_some() {
             lines = lines.replacen("rand", "", 1);
@@ -288,7 +291,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                 let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                 let temp: i64 = rng.gen_range(1, 10);
                 memory.push(Variable {
-                    name: params[0].trim().to_string(),
+                    name: params[0].trim().replace(" ", ""),
                     value: temp as f64,
                     expr: temp.to_string(),
                 });
@@ -301,7 +304,7 @@ fn interactive(memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) {
                     compute(&String::from(params[2]), memory, name_space).round() as i64,
                 );
                 memory.push(Variable {
-                    name: params[0].trim().to_string(),
+                    name: params[0].trim().replace(" ", ""),
                     value: temp as f64,
                     expr: temp.to_string(),
                 });
@@ -343,7 +346,11 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 // 「end for」でループ終わり
                 for i in 0..count {
                     println!("{}回目のループ", i + 1); //ループ実行
-                    execute(stmt.clone(), memory, name_space);
+                    let status = execute(stmt.clone(), memory, name_space);
+                    if status == 1.0 {
+                        //状態が1(break)の時はループを抜け出す
+                        break;
+                    }
                 }
             } else {
                 stmt += lines;
@@ -357,7 +364,10 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 println!("ifの条件式を評価します");
                 if compute(&expr, memory, name_space) != 0.0 {
                     println!("条件が一致したので、実行します");
-                    execute(stmt.clone(), memory, name_space);
+                    let status = execute(stmt.clone(), memory, name_space);
+                    if status == 1.0 {
+                        return 1.0;
+                    }
                     stmt = String::new();
                 } else {
                     println!("条件が一致しなかったので、実行しません");
@@ -385,12 +395,19 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 println!("ifの条件式を評価します");
                 if compute(&expr, memory, name_space) == 0.0 {
                     println!("条件が一致しなかったので、elseのコードを実行します");
-                    execute(else_stmt.clone(), memory, name_space);
+                    let status = execute(else_stmt.clone(), memory, name_space);
+                    if status == 1.0 {
+                        return 1.0;
+                    }
                     else_stmt = String::new();
                     stmt = String::new();
                 } else {
                     println!("条件が一致したので、実行します");
-                    execute(stmt.clone(), memory, name_space);
+
+                    let status = execute(stmt.clone(), memory, name_space);
+                    if status == 1.0 {
+                        return 1.0;
+                    }
                     else_stmt = String::new();
                     stmt = String::new();
                 }
@@ -408,7 +425,11 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                         stmt = String::new();
                         break;
                     }
-                    execute(stmt.clone(), memory, name_space);
+                    let status = execute(stmt.clone(), memory, name_space);
+                    if status == 1.0 {
+                        //状態が1(break)の時はループを抜け出す
+                        break;
+                    }
                 }
                 mode = old_mode.clone();
             } else {
@@ -417,25 +438,25 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
             }
         } else {
             if lines.find("var").is_some() {
-                let new_lines = lines.replacen("var", "", 1); // Create a new String
+                let new_lines = lines.replacen("var", "", 1);
                 lines = &new_lines;
                 let params: Vec<&str> = lines.split("=").collect();
                 let value = compute(&params[1..].join("=").to_string(), memory, name_space);
                 memory.push(Variable {
-                    name: params[0].trim().to_string(),
+                    name: params[0].trim().replace(" ", ""),
                     value: value,
                     expr: params[1..].join("=").to_string(),
                 });
             } else if lines.find("calc").is_some() {
-                let new_lines = lines.replacen("calc", "", 1); // Create a new String
+                let new_lines = lines.replacen("calc", "", 1);
                 let name = &new_lines;
-                for index in 0..memory.len() {
-                    if name.to_string() == memory[index].name {
-                        memory[index].value =
-                            compute(&memory[index].to_owned().expr, memory, name_space);
+                match reference_variable(name.to_owned(), memory) {
+                    Some(index) => {
+                        let value = compute(&memory[index].to_owned().expr, memory, name_space);
+                        memory[index].value = value;
                         println!("再計算を実行しました");
-                        break;
                     }
+                    None => {}
                 }
             } else if lines.find("mem").is_some() {
                 if memory.len() != 0 {
@@ -465,11 +486,11 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                     println!("関数がありません");
                 }
             } else if lines.find("func").is_some() {
-                let new_lines = lines.replacen("func", "", 1); // Create a new String
+                let new_lines = lines.replacen("func", "", 1);
                 name = new_lines;
                 mode = "func".to_string();
             } else if lines.find("call").is_some() {
-                let new_lines = lines.replacen("call", "", 1); // Create a new String
+                let new_lines = lines.replacen("call", "", 1);
                 let name = &new_lines;
                 let codes = match name_space.iter().position(|x| x.name == name.to_string()) {
                     Some(index) => name_space[index].code.clone(),
@@ -482,22 +503,22 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                 println!("関数{name}を呼び出します");
                 execute(codes.clone(), memory, name_space);
             } else if lines.find("for").is_some() {
-                let new_lines = lines.replacen("for", "", 1); // Create a new String
+                let new_lines = lines.replacen("for", "", 1);
                 count = compute(&new_lines, memory, name_space) as i32;
                 old_mode = mode;
                 mode = "for".to_string();
             } else if lines.find("if").is_some() {
-                let new_lines = lines.replacen("if", "", 1); // Create a new String
+                let new_lines = lines.replacen("if", "", 1);
                 expr = new_lines;
                 old_mode = mode;
                 mode = "if".to_string()
             } else if lines.find("while").is_some() {
-                let new_lines = lines.replacen("while", "", 1); // Create a new String
+                let new_lines = lines.replacen("while", "", 1);
                 expr = new_lines;
                 old_mode = mode;
                 mode = "while".to_string();
             } else if lines.find("input").is_some() {
-                let new_lines = lines.replacen("input", "", 1); // Create a new String
+                let new_lines = lines.replacen("input", "", 1);
                 let name = &new_lines;
 
                 let inputed = input::input("[入力]> ");
@@ -508,7 +529,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                     expr: inputed,
                 });
             } else if lines.find("print").is_some() {
-                let new_lines = lines.replacen("print", "", 1); // Create a new String
+                let new_lines = lines.replacen("print", "", 1);
                 let mut text = String::new();
                 let params = &new_lines;
                 for i in params.split(",").collect::<Vec<&str>>() {
@@ -530,7 +551,7 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(1, 10);
                     memory.push(Variable {
-                        name: params[0].trim().to_string(),
+                        name: params[0].trim().replace(" ", ""),
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
@@ -543,24 +564,35 @@ fn execute(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>)
                         compute(&String::from(params[2]), memory, name_space).round() as i64,
                     );
                     memory.push(Variable {
-                        name: params[0].trim().to_string(),
+                        name: params[0].trim().replace(" ", ""),
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
                 }
             } else if lines.find("del").is_some() {
-                let new_lines = lines.replacen("del", "", 1); // Create a new String
+                let new_lines = lines.replacen("del", "", 1);
                 let name = &new_lines;
-                for index in 0..memory.len() {
-                    if name.to_string() == memory[index].name {
+                match reference_variable(name.clone(), memory) {
+                    Some(index) => {
                         memory.remove(index);
                         println!("変数を削除しました");
-                        break;
+                        continue;
                     }
+                    None => {}
+                }
+                match reference_function(name.to_owned(), name_space) {
+                    Some(index) => {
+                        memory.remove(index);
+                        println!("関数を削除しました");
+                        continue;
+                    }
+                    None => {}
                 }
             } else if lines.find("return").is_some() {
-                let return_value = lines.replacen("return", "", 1); // Create a new String
+                let return_value = lines.replacen("return", "", 1);
                 return compute(&return_value, memory, name_space);
+            } else if lines.find("break").is_some() {
+                return 1.0;
             } else if lines.find("#").is_some() {
             } else if lines == "exit" {
                 println!("終了します");
@@ -588,7 +620,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
     let mut nest_if = 0; // ifネストの階層を表す
     let mut nest_for = 0; // forネストの階層を表す
     let mut nest_while = 0; // whileネストの階層を表す
-    let mut nest_code = 0; // codeネストの階層を表す
+    let mut nest_func = 0; // funcネストの階層を表す
 
     for mut lines in code.split("\n") {
         lines = lines.trim_start().trim_end();
@@ -600,7 +632,11 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     stmt += "\n";
                 } else {
                     for _ in 0..count {
-                        script(stmt.clone(), memory, name_space);
+                        let status = script(stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            //状態が1(break)の時はループを抜け出す
+                            break;
+                        }
                     }
                     stmt = String::new();
                     mode = old_mode.clone();
@@ -624,7 +660,10 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     stmt += "\n";
                 } else {
                     if calculation(&expr, memory, name_space) != 0.0 {
-                        script(stmt.clone(), memory, name_space);
+                        let status = script(stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            return 1.0;
+                        }
                         stmt = String::new();
                     } else {
                         stmt = String::new();
@@ -641,8 +680,8 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
             }
         } else if mode == "func".to_string() {
             if lines.find("end func").is_some() {
-                if nest_code > 0 {
-                    nest_code -= 1;
+                if nest_func > 0 {
+                    nest_func -= 1;
                 } else {
                     name_space.push(Func {
                         name: name.clone(),
@@ -652,7 +691,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     mode = old_mode.clone();
                 }
             } else if lines.find("func").is_some() {
-                nest_code += 1;
+                nest_func += 1;
             } else {
                 stmt += lines;
                 stmt += &String::from("\n");
@@ -665,11 +704,17 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     stmt += "\n";
                 } else {
                     if calculation(&expr, memory, name_space) == 0.0 {
-                        script(else_stmt.clone(), memory, name_space);
+                        let status = script(else_stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            return 1.0;
+                        }
                         else_stmt = String::new();
                         stmt = String::new();
                     } else {
-                        script(stmt.clone(), memory, name_space);
+                        let status = script(stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            return 1.0;
+                        }
                         else_stmt = String::new();
                         stmt = String::new();
                     }
@@ -694,7 +739,11 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                             stmt = String::new();
                             break;
                         } else {
-                            script(stmt.clone(), memory, name_space);
+                            let status = script(stmt.clone(), memory, name_space);
+                            if status == 1.0 {
+                                //状態が1(break)の時はループを抜け出す
+                                break;
+                            }
                         }
                     }
                     mode = old_mode.clone();
@@ -707,58 +756,56 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
             }
         } else {
             if lines.find("var").is_some() {
-                let new_lines = lines.replacen("var", "", 1); // Create a new String
+                let new_lines = lines.replacen("var", "", 1);
                 lines = &new_lines;
                 let params: Vec<&str> = lines.split("=").collect();
-                let value = calculation(&params[1..].join("").to_string(), memory, name_space);
+                let value = calculation(&params[1..].join("=").to_string(), memory, name_space);
                 memory.push(Variable {
-                    name: params[0].trim().to_string(),
+                    name: params[0].trim().replace(" ", ""),
                     value: value,
                     expr: params[1..].join("=").to_string(),
                 });
             } else if lines.find("calc").is_some() {
-                let new_lines = lines.replacen("calc", "", 1); // Create a new String
+                let new_lines = lines.replacen("calc", "", 1);
                 let name = &new_lines;
-                for index in 0..memory.len() {
-                    if name.to_string() == memory[index].name {
-                        memory[index].value =
-                            calculation(&memory[index].to_owned().expr, memory, name_space);
-                        break;
+                match reference_variable(name.to_string(), memory) {
+                    Some(index) => {
+                        let value = calculation(&memory[index].to_owned().expr, memory, name_space);
+                        memory[index].value = value;
                     }
+                    None => {}
                 }
             } else if lines.find("func").is_some() {
-                let new_lines = lines.trim().replacen("func", "", 1).replace(" ", ""); // Create a new String
+                let new_lines = lines.trim().replacen("func", "", 1).replace(" ", "");
                 name = new_lines.replace(" ", "");
                 mode = "func".to_string();
             } else if lines.find("call").is_some() {
-                let new_lines = lines.replacen("call", "", 1); // Create a new String
+                let new_lines = lines.replacen("call", "", 1);
                 let name = &new_lines.replace(" ", "");
-                let code = match name_space.iter().position(|x| x.name == name.to_string()) {
-                    Some(index) => name_space[index].code.clone(),
-                    None => {
-                        println!("関数{name}が見つかりません");
-                        "".to_string();
-                        continue;
+                match reference_function(name.clone(), name_space) {
+                    Some(index) => {
+                        script(name_space[index].code.clone(), memory, name_space);
                     }
-                };
+                    None => {}
+                }
                 script(code.clone(), memory, name_space);
             } else if lines.find("for").is_some() {
-                let new_lines = lines.replacen("for", "", 1); // Create a new String
+                let new_lines = lines.replacen("for", "", 1);
                 count = calculation(&new_lines, memory, name_space) as i32;
                 old_mode = mode;
                 mode = "for".to_string();
             } else if lines.find("if").is_some() {
-                let new_lines = lines.replacen("if", "", 1); // Create a new String
+                let new_lines = lines.replacen("if", "", 1);
                 expr = new_lines;
                 old_mode = mode;
                 mode = "if".to_string()
             } else if lines.find("while").is_some() {
-                let new_lines = lines.replacen("while", "", 1); // Create a new String
+                let new_lines = lines.replacen("while", "", 1);
                 expr = new_lines;
                 old_mode = mode;
                 mode = "while".to_string();
             } else if lines.find("input").is_some() {
-                let new_lines = lines.replacen("input", "", 1); // Create a new String
+                let new_lines = lines.replacen("input", "", 1);
                 let name = &new_lines;
 
                 let inputed = input::input("> ");
@@ -769,7 +816,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     expr: inputed,
                 });
             } else if lines.find("print").is_some() {
-                let new_lines = lines.replacen("print", "", 1); // Create a new String
+                let new_lines = lines.replacen("print", "", 1);
                 let mut text = String::new();
                 let params = &new_lines;
                 for i in params.split(",").collect::<Vec<&str>>() {
@@ -783,13 +830,21 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                 }
                 println!("{text}");
             } else if lines.find("del").is_some() {
-                let new_lines = lines.replacen("del", "", 1); // Create a new String
+                let new_lines = lines.replacen("del", "", 1);
                 let name = &new_lines;
-                for index in 0..memory.len() {
-                    if name.to_string() == memory[index].name {
+                match reference_variable(name.clone(), memory) {
+                    Some(index) => {
                         memory.remove(index);
-                        break;
+                        continue;
                     }
+                    None => {}
+                }
+                match reference_function(name.to_owned(), name_space) {
+                    Some(index) => {
+                        memory.remove(index);
+                        continue;
+                    }
+                    None => {}
                 }
             } else if lines.find("#").is_some() {
             } else if lines.find("rand").is_some() {
@@ -801,7 +856,7 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(1, 10);
                     memory.push(Variable {
-                        name: params[0].trim().to_string(),
+                        name: params[0].trim().replace(" ", ""),
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
@@ -814,14 +869,16 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                         calculation(&String::from(params[2]), memory, name_space).round() as i64,
                     );
                     memory.push(Variable {
-                        name: params[0].trim().to_string(),
+                        name: params[0].trim().replace(" ", ""),
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
                 }
             } else if lines.find("return").is_some() {
-                let return_value = lines.replacen("return", "", 1); // Create a new String
+                let return_value = lines.replacen("return", "", 1);
                 return calculation(&return_value, memory, name_space);
+            } else if lines.find("break").is_some() {
+                return 1.0;
             } else if lines == "exit" {
                 exit(0);
             } else if lines == "" {
@@ -847,48 +904,46 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                     stack.push(num);
                     continue;
                 }
-                Err(_) => match memory.iter().position(|x| x.name == i.to_string()) {
-                    Some(index) => {
-                        stack.push(memory[index].value); //　メモリを参照
-                    }
-                    None => {
-                        match name_space.iter().position(|x| x.name == i.to_string()) {
-                            Some(index) => {
-                                stack.push(script(
-                                    name_space[index].code.clone(), //　関数呼び出し
-                                    memory,
-                                    name_space,
-                                ));
-                            }
-                            None => {
-                                let y = stack.pop().unwrap_or(0.0);
-                                let x = stack.pop().unwrap_or(0.0);
-                                match i {
-                                    "+" => stack.push(x + y),
-                                    "-" => stack.push(x - y),
-                                    "*" => stack.push(x * y),
-                                    "/" => stack.push(x / y),
-                                    "%" => stack.push(x % y),
-                                    "^" => stack.push(x.powf(y)),
-                                    "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
-                                    "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
-                                    "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
-                                    ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
-                                    "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
-                                    "!" => {
-                                        stack.push(x);
-                                        stack.push(if y == 0.0 { 1.0 } else { 0.0 })
-                                    }
-                                    _ => {
-                                        stack.push(x);
-                                        stack.push(y);
-                                    }
+                Err(_) => {
+                    let y = stack.pop().unwrap_or(0.0);
+                    let x = stack.pop().unwrap_or(0.0);
+                    match i {
+                        "+" => stack.push(x + y),
+                        "-" => stack.push(x - y),
+                        "*" => stack.push(x * y),
+                        "/" => stack.push(x / y),
+                        "%" => stack.push(x % y),
+                        "^" => stack.push(x.powf(y)),
+                        "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
+                        "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
+                        "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
+                        ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
+                        "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
+                        "!" => {
+                            stack.push(x);
+                            stack.push(if y == 0.0 { 1.0 } else { 0.0 })
+                        }
+                        _ => {
+                            stack.push(x);
+                            stack.push(y);
+
+                            match reference_variable_quiet(i.to_string(), memory) {
+                                Some(i) => {
+                                    stack.push(memory[i].value);
                                 }
+                                None => match reference_function_quiet(i.to_string(), name_space) {
+                                    Some(i) => stack.push(script(
+                                        name_space[i].code.clone(),
+                                        memory,
+                                        name_space,
+                                    )),
+                                    None => {}
+                                },
                             }
-                        };
+                        }
                     }
-                },
-            };
+                }
+            }
         }
         let result = stack.pop().unwrap_or(0.0);
         return result;
@@ -908,7 +963,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
     let mut nest_if = 0; // ifネストの階層を表す
     let mut nest_for = 0; // forネストの階層を表す
     let mut nest_while = 0; // whileネストの階層を表す
-    let mut nest_code = 0; // codeネストの階層を表す
+    let mut nest_func = 0; // funcネストの階層を表す
 
     // 改行区切りで実行する
     for mut lines in code.split("\n") {
@@ -927,7 +982,11 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                 } else {
                     // 「end for」でループ終わり
                     for _ in 0..count {
-                        debug(stmt.clone(), memory, name_space);
+                        let status = debug(stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            //状態が1(break)の時はループを抜け出す
+                            break;
+                        }
                     }
                 }
                 stmt = String::new();
@@ -953,7 +1012,10 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     println!("ifの条件式を評価します");
                     if compute(&expr, memory, name_space) != 0.0 {
                         println!("条件が一致したので、実行します");
-                        debug(stmt.clone(), memory, name_space);
+                        let status = debug(stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            return 1.0;
+                        }
                         stmt = String::new();
                     } else {
                         println!("条件が一致しなかったので、実行しません");
@@ -971,8 +1033,8 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
             }
         } else if mode == "func".to_string() {
             if lines == "end func" {
-                if nest_code > 0 {
-                    nest_code -= 1;
+                if nest_func > 0 {
+                    nest_func -= 1;
                     stmt += lines;
                     stmt += "\n";
                 } else {
@@ -984,7 +1046,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     mode = old_mode.clone();
                 }
             } else if lines.find("func").is_some() {
-                nest_code += 1;
+                nest_func += 1;
                 stmt += lines;
                 stmt += "\n";
             } else {
@@ -1001,12 +1063,18 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     println!("ifの条件式を評価します");
                     if compute(&expr, memory, name_space) == 0.0 {
                         println!("条件が一致しなかったので、elseのコードを実行します");
-                        debug(else_stmt.clone(), memory, name_space);
+                        let status = debug(else_stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            return 1.0;
+                        }
                         else_stmt = String::new();
                         stmt = String::new();
                     } else {
                         println!("条件が一致したので、実行します");
-                        debug(stmt.clone(), memory, name_space);
+                        let status = debug(stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            return 1.0;
+                        }
                         else_stmt = String::new();
                         stmt = String::new();
                     }
@@ -1034,7 +1102,11 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                             stmt = String::new();
                             break;
                         }
-                        debug(stmt.clone(), memory, name_space);
+                        let status = debug(stmt.clone(), memory, name_space);
+                        if status == 1.0 {
+                            //状態が1(break)の時はループを抜け出す
+                            break;
+                        }
                     }
                 }
                 mode = old_mode.clone();
@@ -1049,24 +1121,24 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
         } else {
             println!("+- {number}行: [{lines}]を実行");
             if lines.find("var").is_some() {
-                let new_lines = lines.replacen("var", "", 1); // Create a new String
+                let new_lines = lines.replacen("var", "", 1);
                 let params: Vec<&str> = new_lines.split("=").collect();
                 let value = compute(&params[1..].join("=").to_string(), memory, name_space);
                 memory.push(Variable {
-                    name: params[0].trim().to_string(),
+                    name: params[0].trim().replace(" ", ""),
                     value: value,
                     expr: params[1..].join("=").to_string(),
                 });
             } else if lines.find("calc").is_some() {
-                let new_lines = lines.replacen("calc", "", 1); // Create a new String
+                let new_lines = lines.replacen("calc", "", 1);
                 let name = &new_lines;
-                for index in 0..memory.len() {
-                    if name.to_string() == memory[index].name {
-                        memory[index].value =
-                            compute(&memory[index].to_owned().expr, memory, name_space);
+                match reference_variable(name.to_owned(), memory) {
+                    Some(index) => {
+                        let value = compute(&memory[index].to_owned().expr, memory, name_space);
+                        memory[index].value = value;
                         println!("再計算を実行しました");
-                        break;
                     }
+                    None => {}
                 }
             } else if lines.find("mem").is_some() {
                 println!("+-- メモリ内の変数 --");
@@ -1086,11 +1158,11 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     }
                 }
             } else if lines.find("func").is_some() {
-                name = lines.trim().replacen("func", "", 1).replace(" ", ""); // Create a new String
+                name = lines.trim().replacen("func", "", 1).replace(" ", "");
                 mode = "func".to_string();
                 println!("関数{name}を定義します");
             } else if lines.find("call").is_some() {
-                name = lines.trim().replacen("call", "", 1); // Create a new String
+                name = lines.trim().replacen("call", "", 1).replace(" ", "");
                 let codes = match name_space.iter().position(|x| x.name == name.to_string()) {
                     Some(index) => name_space[index].code.clone(),
                     None => {
@@ -1102,22 +1174,22 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                 println!("関数{name}を呼び出します");
                 debug(codes.clone(), memory, name_space);
             } else if lines.find("for").is_some() {
-                let new_lines = lines.replacen("for", "", 1); // Create a new String
+                let new_lines = lines.replacen("for", "", 1);
                 count = compute(&new_lines, memory, name_space) as i32;
                 old_mode = mode;
                 mode = "for".to_string();
             } else if lines.find("if").is_some() {
-                let new_lines = lines.replacen("if", "", 1); // Create a new String
+                let new_lines = lines.replacen("if", "", 1);
                 expr = new_lines;
                 old_mode = mode;
                 mode = "if".to_string()
             } else if lines.find("while").is_some() {
-                let new_lines = lines.replacen("while", "", 1); // Create a new String
+                let new_lines = lines.replacen("while", "", 1);
                 expr = new_lines;
                 old_mode = mode;
                 mode = "while".to_string();
             } else if lines.find("input").is_some() {
-                let new_lines = lines.replacen("input", "", 1); // Create a new String
+                let new_lines = lines.replacen("input", "", 1);
                 let name = &new_lines;
 
                 let inputed = input::input("[入力]> ");
@@ -1128,7 +1200,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     expr: inputed,
                 });
             } else if lines.find("print").is_some() {
-                let new_lines = lines.replacen("print", "", 1); // Create a new String
+                let new_lines = lines.replacen("print", "", 1);
                 let mut text = String::new();
                 let params = &new_lines;
                 for i in params.split(",").collect::<Vec<&str>>() {
@@ -1142,14 +1214,23 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                 }
                 println!("[出力]: {text}");
             } else if lines.find("del").is_some() {
-                let new_lines = lines.replacen("del", "", 1); // Create a new String
+                let new_lines = lines.replacen("del", "", 1);
                 let name = &new_lines;
-                for index in 0..memory.len() {
-                    if name.to_string() == memory[index].name {
+                match reference_variable(name.clone(), memory) {
+                    Some(index) => {
                         memory.remove(index);
                         println!("変数を削除しました");
-                        break;
+                        continue;
                     }
+                    None => {}
+                }
+                match reference_function(name.to_owned(), name_space) {
+                    Some(index) => {
+                        memory.remove(index);
+                        println!("関数を削除しました");
+                        continue;
+                    }
+                    None => {}
                 }
             } else if lines.find("#").is_some() {
             } else if lines.find("rand").is_some() {
@@ -1161,7 +1242,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                     let temp: i64 = rng.gen_range(1, 10);
                     memory.push(Variable {
-                        name: params[0].trim().to_string(),
+                        name: params[0].trim().replace(" ", ""),
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
@@ -1174,14 +1255,16 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                         compute(&String::from(params[2]), memory, name_space).round() as i64,
                     );
                     memory.push(Variable {
-                        name: params[0].trim().to_string(),
+                        name: params[0].trim().replace(" ", ""),
                         value: temp as f64,
                         expr: temp.to_string(),
                     });
                 }
             } else if lines.find("return").is_some() {
-                let return_value = lines.replacen("return", "", 1); // Create a new String
+                let return_value = lines.replacen("return", "", 1);
                 return compute(&return_value, memory, name_space);
+            } else if lines.find("break").is_some() {
+                return 1.0;
             } else if lines == "exit" {
                 println!("終了します");
                 exit(0);
@@ -1189,6 +1272,8 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
             } else {
                 println!("コマンドが不正です: {}", lines)
             }
+            remove_duplicates_variable(memory);
+            remove_duplicates_function(name_space);
 
             // デバッグメニューを表示する
             loop {
@@ -1198,7 +1283,7 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
                     let params: Vec<&str> = lim.split("=").collect();
                     let value = compute(&params[1..].join("=").to_string(), memory, name_space);
                     memory.push(Variable {
-                        name: params[0].trim().to_string(),
+                        name: params[0].trim().replace(" ", ""),
                         value,
                         expr: params[1..].join("=").to_string(),
                     });
@@ -1237,6 +1322,56 @@ fn debug(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -
     return 0.0;
 }
 
+///　変数の参照
+fn reference_variable(name: String, memory: &mut Vec<Variable>) -> Option<usize> {
+    match memory
+        .iter()
+        .position(|x| x.name == name.trim().replace(" ", ""))
+    {
+        Some(index) => Some(index),
+        None => {
+            println!("変数{name}が見つかりません");
+            None
+        }
+    }
+}
+
+///　関数の参照
+fn reference_function(name: String, name_space: &mut Vec<Func>) -> Option<usize> {
+    match name_space
+        .iter()
+        .position(|x| x.name == name.trim().replace(" ", ""))
+    {
+        Some(index) => Some(index),
+        None => {
+            println!("関数{name}が見つかりません");
+            None
+        }
+    }
+}
+
+/// 変数の参照(ログ出力なし)
+fn reference_variable_quiet(name: String, memory: &mut Vec<Variable>) -> Option<usize> {
+    match memory
+        .iter()
+        .position(|x| x.name == name.trim().replace(" ", ""))
+    {
+        Some(index) => Some(index),
+        None => None,
+    }
+}
+
+/// 関数の参照(ログ出力なし)
+fn reference_function_quiet(name: String, name_space: &mut Vec<Func>) -> Option<usize> {
+    match name_space
+        .iter()
+        .position(|x| x.name == name.trim().replace(" ", ""))
+    {
+        Some(index) => Some(index),
+        None => None,
+    }
+}
+
 /// 逆ポーランド記法の式を計算する
 fn compute(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) -> f64 {
     let mut stack: Vec<f64> = Vec::new();
@@ -1253,45 +1388,44 @@ fn compute(expr: &String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>
                 stack.push(num);
                 continue;
             }
-            Err(_) => match memory.iter().position(|x| x.name == i.to_string()) {
-                Some(index) => {
-                    stack.push(memory[index].value);
-                }
-                None => {
-                    match name_space.iter().position(|x| x.name == i.to_string()) {
-                        Some(index) => {
-                            println!("関数{i}を呼び出します");
-                            stack.push(execute(name_space[index].code.clone(), memory, name_space));
-                        }
-                        None => {
-                            let y = stack.pop().unwrap_or(0.0);
-                            let x = stack.pop().unwrap_or(0.0);
-                            match i {
-                                "+" => stack.push(x + y),
-                                "-" => stack.push(x - y),
-                                "*" => stack.push(x * y),
-                                "/" => stack.push(x / y),
-                                "%" => stack.push(x % y),
-                                "^" => stack.push(x.powf(y)),
-                                "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
-                                "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
-                                "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
-                                ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
-                                "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
-                                "!" => {
-                                    stack.push(x);
-                                    stack.push(if y == 0.0 { 1.0 } else { 0.0 })
-                                }
-                                _ => {
-                                    println!("[ERROR] this operator is invalid \"{}\"", i);
-                                    stack.push(x);
-                                    stack.push(y);
-                                }
+            Err(_) => {
+                let y = stack.pop().unwrap_or(0.0);
+                let x = stack.pop().unwrap_or(0.0);
+                match i {
+                    "+" => stack.push(x + y),
+                    "-" => stack.push(x - y),
+                    "*" => stack.push(x * y),
+                    "/" => stack.push(x / y),
+                    "%" => stack.push(x % y),
+                    "^" => stack.push(x.powf(y)),
+                    "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
+                    "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
+                    "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
+                    ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
+                    "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
+                    "!" => {
+                        stack.push(x);
+                        stack.push(if y == 0.0 { 1.0 } else { 0.0 })
+                    }
+                    _ => {
+                        stack.push(x);
+                        stack.push(y);
+
+                        match reference_variable_quiet(i.to_string(), memory) {
+                            Some(i) => {
+                                stack.push(memory[i].value);
                             }
+                            None => {}
                         }
-                    };
+                        match reference_function_quiet(i.to_string(), name_space) {
+                            Some(i) => {
+                                stack.push(execute(name_space[i].code.clone(), memory, name_space))
+                            }
+                            None => {}
+                        }
+                    }
                 }
-            },
+            }
         };
     }
     let result = stack.pop().unwrap_or(0.0);
