@@ -809,8 +809,9 @@ fn script(code: String, memory: &mut Vec<Variable>, name_space: &mut Vec<Func>) 
                                 Some(i) => {
                                     if i == f64::MAX {
                                         //状態が1(break)の時はループを抜け出す
-
                                         break;
+                                    } else {
+                                        return Some(i);
                                     }
                                 }
                                 None => {}
