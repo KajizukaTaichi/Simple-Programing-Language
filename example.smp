@@ -32,15 +32,15 @@ end func
 print'素数判定プログラム'
 print'Build on Simple programing language'
 
-while 1
+while true
     input number
 
-    if number 0 =
+    if number false =
         print'終了します'
-        exit
+        break
     end if
 
-    if prime
+    if prime true =
         print number,'は素数です'
     else
         print number,'は素数ではありません'
