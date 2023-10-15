@@ -3,6 +3,9 @@ use std::fs::File;
 use std::io::{Error, Read};
 mod executor;
 
+#[cfg(test)]
+mod tests; //テストモジュールを読み込む
+
 // /// 変数のデータ
 // #[derive(Clone)]
 // struct Variable {
@@ -1855,14 +1858,14 @@ fn main() {
     let message = "Simple プログラミング言語\nコンピュータの動作原理やロジックを学べます\n(c) 2023 梶塚太智. All rights reserved";
     let args = env::args().collect::<Vec<_>>();
 
-    let mut executor = executor::Executor::new(Vec::new(), Vec::new());
+    let mut executor = executor::Executor::new(&Vec::new(), &Vec::new());
     if args.len() >= 3 {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
             Ok(code) => {
                 if args[1] == "run" || args[1] == "r" {
                     println!("{message}");
-                    executor.execute_block(code);
+                    executor.execute_block(&code);
                 // } else if args[1] == "debug" || args[1] == "d" {
                 //     println!("{}をデバッグします", args[2]);
                 //     debug(func, &mut Vec::new(), &mut Vec::new());

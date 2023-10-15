@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::process::exit;
 
 fn input(prompt: &str) -> String {
-    print!("{}", prompt.to_string());
+    print!("{}", prompt);
     io::stdout().flush().unwrap();
     let mut result = String::new();
     io::stdin().read_line(&mut result).ok();
@@ -77,12 +77,12 @@ fn remove_duplicates_function(memory: &mut Vec<Func>) -> &mut Vec<Func> {
     for (i, index) in to_remove.iter().enumerate() {
         memory.remove(index - i); // Adjust for removed items before
     }
-    return memory;
+    memory
 }
 
 /// コードを実行を管理
 pub struct Executor {
-    memory: Vec<Variable>, // メモリの変数
+    memory: Vec<Variable>, //メモリの変数
     name_space: Vec<Func>, // 関数
     stmt: String,          // ブロックのステートメント
     else_stmt: String,     // elseステートメント
@@ -98,10 +98,10 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub fn new(memory: Vec<Variable>, name_space: Vec<Func>) -> Executor {
+    pub fn new(memory: &Vec<Variable>, name_space: &Vec<Func>) -> Executor {
         Executor {
-            memory,
-            name_space,
+            memory: memory.to_owned(),
+            name_space: name_space.to_owned(),
             stmt: "".to_string(),
             else_stmt: "".to_string(),
             count: 0,
@@ -126,7 +126,7 @@ impl Executor {
                     self.stmt += "\n";
                 } else {
                     for _ in 0..self.count {
-                        let status =  Executor::new(self.memory.clone(), self.name_space.clone()).execute_block(self.stmt.clone());
+                        let status =  Executor::new(&self.memory, &self.name_space).execute_block(&self.stmt);
                         match status {
                             Some(i) => {
                                 if i == f64::MAX {
@@ -142,7 +142,7 @@ impl Executor {
                     self.stmt = String::new();
                     self.mode = self.old_mode.clone();
                 }
-            } else if lines.find("for").is_some() {
+            } else if lines.contains("for") {
                 self.nest_for += 1;
                 self.stmt += lines;
                 self.stmt += "\n";
@@ -161,7 +161,7 @@ impl Executor {
                     self.stmt += "\n";
                 } else {
                     if self.calculation(self.expr.clone()) != 0.0{
-                        let status = Executor::new(self.memory.clone(), self.name_space.clone()).execute_block(self.stmt.clone());
+                        let status = Executor::new(&self.memory, &self.name_space).execute_block(&self.stmt);
                         match status {
                             Some(i) => {
                                 if i == f64::MAX {
@@ -187,7 +187,7 @@ impl Executor {
                 self.stmt += "\n";
             }
         } else if self.mode == "func".to_string() {
-            if lines.find("end func").is_some() {
+            if lines.contains("end func") {
                 if self.nest_func > 0 {
                     self.nest_func -= 1;
                 } else {
@@ -211,8 +211,8 @@ impl Executor {
                     self.stmt += lines;
                     self.stmt += "\n";
                 } else {
-                    if self.calculation(self.expr.clone()) != 0.0 {
-                        let status =  Executor::new(self.memory.clone(), self.name_space.clone()).execute_block(self.else_stmt.clone());
+                    if self.calculation(self.expr.clone()) == 0.0 {
+                        let status =  Executor::new(&self.memory, &self.name_space).execute_block(&self.else_stmt);
                         match status {
                             Some(i) => {
                                 if i == f64::MAX {
@@ -226,7 +226,7 @@ impl Executor {
                         self.else_stmt = String::new();
                         self.stmt = String::new();
                     } else {
-                        let status =  Executor::new(self.memory.clone(), self.name_space.clone()).execute_block(self.stmt.clone());
+                        let status =  Executor::new(&self.memory, &self.name_space).execute_block(&self.stmt);
                         match status {
                             Some(i) => {
                                 if i == f64::MAX {
@@ -261,7 +261,7 @@ impl Executor {
                             self.stmt = String::new();
                             break;
                         } else {
-                            let status =  Executor::new(self.memory.clone(), self.name_space.clone()).execute_block(self.stmt.clone());
+                            let status =  Executor::new(&self.memory, &self.name_space).execute_block(&self.stmt);
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -291,7 +291,7 @@ impl Executor {
                 let value = self.calculation(params[1..].join("=").to_string());
                 self.memory.push(Variable {
                     name: params[0].trim().replace(" ", ""),
-                    value: value,
+                    value,
                     expr: params[1..].join("=").to_string(),
                 });
             } else if lines.find("calc").is_some() {
@@ -313,7 +313,7 @@ impl Executor {
                 let name = &new_lines.replace(" ", "");
                 match self.reference_function(name.clone()) {
                     Some(index) => {
-                         Executor::new(self.memory.clone(), self.name_space.clone()).execute_block(self.name_space[index].code.clone());
+                         Executor::new(&self.memory, &self.name_space).execute_block(&self.name_space[index].code);
                     }
                     None => {}
                 }
@@ -412,9 +412,9 @@ impl Executor {
         return None;
     }
 
-    pub fn execute_block(&mut self, code: String) -> Option<f64> {
+    pub fn execute_block(&mut self, code: &String) -> Option<f64> {
         for lin in code.split("\n") {
-            match  self.execute(lin.to_string()) {
+            match self.execute(lin.to_string()) {
                 Some(i) => return Some(i),
                 None => {}
             }
@@ -523,7 +523,7 @@ impl Executor {
                             }
                             match self.reference_function_quiet(i.to_string()) {
                                 Some(i) => stack.push(
-                                    match  Executor::new(self.memory.clone(), self.name_space.clone()).execute_block(self.name_space[i].code.clone()) {
+                                    match  Executor::new(&self.memory, &self.name_space).execute_block(&self.name_space[i].code) {
                                         Some(i) => i,
                                         None => 0.0,
                                     },
@@ -586,7 +586,7 @@ impl Executor {
                             match self.reference_function_quiet(i.to_string()) {
                                 Some(index) => stack.push({
                                     println!("関数{i}を呼び出します");
-                                    match  Executor::new(self.memory.clone(), self.name_space.clone()).execute_block(self.name_space[index].code.clone()) {
+                                    match  Executor::new(&self.memory, &self.name_space).execute_block(&self.name_space[index].code) {
                                         Some(indes) => indes,
                                         None => 0.0,
                                     }
