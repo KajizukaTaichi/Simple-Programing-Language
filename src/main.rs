@@ -1866,12 +1866,12 @@ fn main() {
                 if args[1] == "run" || args[1] == "r" {
                     println!("{message}");
                     executor.execute_block(&code);
-                // } else if args[1] == "debug" || args[1] == "d" {
-                //     println!("{}をデバッグします", args[2]);
-                //     debug(func, &mut Vec::new(), &mut Vec::new());
-                // } else if args[1] == "interactive" || args[1] == "i" {
-                //     println!("{message}");
-                //     interactive(&mut Vec::new(), &mut Vec::new());
+                } else if args[1] == "debug" || args[1] == "d" {
+                    println!("{}をデバッグします", args[2]);
+                    executor.debug(&code);
+                } else if args[1] == "interactive" || args[1] == "i" {
+                    println!("{message}");
+                    executor.interactive();
                 } else {
                     println!("実行モードを正しく指定してください")
                 }
@@ -1880,22 +1880,22 @@ fn main() {
                 eprintln!("エラー! :{}", e);
             }
         }
-        // } else if args.len() == 2 {
-        //     if args[1] == "interactive" || args[1] == "i" {
-        //         println!("{message}");
-        //         interactive(&mut Vec::new(), &mut Vec::new());
-        //     }
-        //     match get_file_contents(args[1].to_string()) {
-        //         Ok(func) => {
-        //             script(func, &mut Vec::new(), &mut Vec::new());
-        //         }
-        //         Err(e) => {
-        //             eprintln!("エラー! :{}", e);
-        //         }
-        //     }
-        // } else {
-        //     //ファイルがない場合はインタラクティブで実行する
-        //     println!("{message}");
-        //     interactive(&mut Vec::new(), &mut Vec::new());
+    } else if args.len() == 2 {
+        if args[1] == "interactive" || args[1] == "i" {
+            println!("{message}");
+            executor.interactive();
+        }
+        match get_file_contents(args[1].to_string()) {
+            Ok(code) => {
+                executor.execute_block(&code);
+            }
+            Err(e) => {
+                eprintln!("エラー! :{}", e);
+            }
+        }
+    } else {
+        //ファイルがない場合はインタラクティブで実行する
+        println!("{message}");
+        executor.interactive();
     }
 }
