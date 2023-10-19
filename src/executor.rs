@@ -232,7 +232,7 @@ impl Executor {
                             self.else_stmt = String::new();
                             self.stmt = String::new();
                         }
-                        self.mode = self.old_mode.clone();
+                        self.mode = Mode::Normal;
                     }
                 } else if lines.contains("if") {
                     self.nest_if += 1;
@@ -479,7 +479,20 @@ impl Executor {
     /// REPLで対話的に実行する
     pub fn interactive(&mut self) {
         loop {
-            let code = input(">>> ");
+            let code = input(
+                format!(
+                    "{}> ",
+                    match self.mode {
+                        Mode::If => "If分岐",
+                        Mode::Else => "Else分岐",
+                        Mode::For => "Forループ",
+                        Mode::While => "Whileループ",
+                        Mode::Normal => "プログラム",
+                        Mode::Func => "関数定義",
+                    }
+                )
+                .as_str(),
+            );
             self.execute(code);
         }
     }
