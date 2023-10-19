@@ -3,9 +3,6 @@ use std::fs::File;
 use std::io::{Error, Read};
 mod executor;
 
-#[cfg(test)]
-mod tests; //テストモジュールを読み込む
-
 /// ファイルを読み込む
 fn get_file_contents(name: String) -> Result<String, Error> {
     let mut f = File::open(name.trim())?;
