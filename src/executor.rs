@@ -81,7 +81,7 @@ impl Executor {
 
     /// 文の実行
     pub fn execute(&mut self, code: String) -> Option<f64> {
-        let lines = code.trim_start().trim_end();
+        let lines = code.trim().split("#").collect::<Vec<&str>>()[0];
         match self.mode {
             Mode::For => {
                 if lines.contains("end for") {
@@ -109,7 +109,7 @@ impl Executor {
                             }
                         } // モードを元に戻す
                         self.stmt = String::new();
-                        self.mode = self.old_mode.clone();
+                        self.mode = Mode::Normal;
                     }
                 } else if lines.contains("for") {
                     // ネストの階層を上げる
@@ -136,7 +136,7 @@ impl Executor {
                     } else {
                         // 条件式を評価する
                         println!("ifの条件式を評価します");
-                        if self.calculation(self.expr.clone()) != 0.0 {
+                        if self.compute(self.expr.clone()) != 0.0 {
                             println!("条件が一致したので、実行します");
                             let status = Executor::new(&self.memory, &self.name_space)
                                 .execute_block(&self.stmt);
@@ -157,7 +157,7 @@ impl Executor {
                             println!("条件が一致しなかったので、実行しません");
                             self.stmt = String::new();
                         }
-                        self.mode = self.old_mode.clone();
+                        self.mode = Mode::Normal;
                     }
                 } else if lines.contains("if") {
                     self.nest_if += 1;
@@ -181,7 +181,7 @@ impl Executor {
                             code: self.stmt.clone(),
                         });
                         self.stmt = String::new();
-                        self.mode = self.old_mode.clone();
+                        self.mode = Mode::Normal;
                     }
                 } else if lines.contains("func") {
                     self.nest_func += 1;
@@ -272,7 +272,7 @@ impl Executor {
                                 }
                             }
                         }
-                        self.mode = self.old_mode.clone();
+                        self.mode = Mode::Normal;
                     }
                 } else if lines.contains("while") {
                     self.nest_while += 1;
@@ -406,12 +406,11 @@ impl Executor {
                     }
                     match self.reference_function(name.to_owned()) {
                         Some(index) => {
-                            self.memory.remove(index);
+                            self.name_space.remove(index);
                             println!("関数{}を削除しました", name);
                         }
                         None => {}
                     }
-                } else if lines.contains("#") { // コメント
                 } else if lines.contains("rand") {
                     // 乱数
                     let new_lines = lines.replacen("rand", "", 1);
@@ -458,10 +457,10 @@ impl Executor {
                 } else {
                     println!("コマンドが不正です: {}", lines)
                 }
-                self.remove_duplicates_variable();
-                self.remove_duplicates_function();
             }
         }
+        self.remove_duplicates_variable();
+        self.remove_duplicates_function();
         return None;
     }
 
@@ -578,22 +577,6 @@ impl Executor {
         }
     }
 
-    /// 変数の参照(ログ出力なし)
-    fn reference_variable_quiet(&self, name: String) -> Option<usize> {
-        let name = name.trim().replace(" ", "");
-        self.memory
-            .iter()
-            .position(|x| x.name == name.trim().replace(" ", ""))
-    }
-
-    /// 関数の参照(ログ出力なし)
-    fn reference_function_quiet(&self, name: String) -> Option<usize> {
-        let name = name.trim().replace(" ", "");
-        self.name_space
-            .iter()
-            .position(|x| x.name == name.trim().replace(" ", ""))
-    }
-
     /// 変数の重複を削除する
     fn remove_duplicates_variable(&mut self) {
         let mut seen_names = std::collections::HashMap::new();
@@ -623,85 +606,26 @@ impl Executor {
         let mut seen_names = std::collections::HashMap::new();
         let mut to_remove = Vec::new();
 
-        for (index, memory) in self.memory.iter().enumerate() {
-            if let Some(existing_index) = seen_names.get(&memory.name) {
+        for (index, name_space) in self.name_space.iter().enumerate() {
+            if let Some(existing_index) = seen_names.get(&name_space.name) {
                 to_remove.push(if existing_index < &index {
                     *existing_index
                 } else {
                     index
                 });
             } else {
-                seen_names.insert(&memory.name, index);
+                seen_names.insert(&name_space.name, index);
             }
         }
 
         to_remove.sort(); // Sort indices in ascending order
 
         for (i, index) in to_remove.iter().enumerate() {
-            self.memory.remove(index - i); // Adjust for removed items before
+            self.name_space.remove(index - i); // Adjust for removed items before
         }
     }
 
     /// 式の計算
-    fn calculation(&mut self, expr: String) -> f64 {
-        let mut stack: Vec<f64> = Vec::new();
-        let tokens = expr.split_whitespace();
-        for i in tokens {
-            let i = i.trim();
-            if i.is_empty() {
-                continue;
-            }
-            match i.parse::<f64>() {
-                Ok(num) => {
-                    stack.push(num);
-                    continue;
-                }
-                Err(_) => {
-                    let y = stack.pop().unwrap_or(0.0);
-                    let x = stack.pop().unwrap_or(0.0);
-                    match i {
-                        "+" => stack.push(x + y),
-                        "-" => stack.push(x - y),
-                        "*" => stack.push(x * y),
-                        "/" => stack.push(x / y),
-                        "%" => stack.push(x % y),
-                        "^" => stack.push(x.powf(y)),
-                        "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
-                        "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
-                        "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
-                        ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
-                        "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
-                        "!" => {
-                            stack.push(x);
-                            stack.push(if y == 0.0 { 1.0 } else { 0.0 })
-                        }
-                        _ => {
-                            stack.push(x);
-                            stack.push(y);
-
-                            match self.reference_variable_quiet(i.to_string()) {
-                                Some(i) => {
-                                    stack.push(self.memory[i].value);
-                                }
-                                None => {}
-                            }
-                            match self.reference_function_quiet(i.to_string()) {
-                                Some(i) => stack.push(
-                                    Executor::new(&self.memory, &self.name_space)
-                                        .execute_block(&self.name_space[i].code)
-                                        .unwrap_or(0.0),
-                                ),
-                                None => {}
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        let result = stack.pop().unwrap_or(0.0);
-        return result;
-    }
-
     fn compute(&mut self, expr: String) -> f64 {
         let mut stack: Vec<f64> = Vec::new();
         let tokens = expr.split_whitespace();
@@ -740,13 +664,14 @@ impl Executor {
                             stack.push(x);
                             stack.push(y);
 
-                            match self.reference_variable_quiet(i.to_string()) {
+                            match self.reference_variable(i.to_string()) {
                                 Some(i) => {
+                                    println!("変数{i}を参照します");
                                     stack.push(self.memory[i].value);
                                 }
                                 None => {}
                             }
-                            match self.reference_function_quiet(i.to_string()) {
+                            match self.reference_function(i.to_string()) {
                                 Some(index) => stack.push({
                                     println!("関数{i}を呼び出します");
                                     match Executor::new(&self.memory, &self.name_space)
