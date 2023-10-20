@@ -317,13 +317,11 @@ impl Executor {
                     let new_lines = lines.replacen("call", "", 1);
                     let name = &new_lines.replace(" ", "").replace("(", "").replace(")", "");
                     println!("関数{name}を呼び出します");
-                    match self.reference_function(name.clone()) {
-                        Some(index) => {
-                            Executor::new(&self.memory, &self.name_space)
-                                .execute_block(&self.name_space[index].code);
-                        }
-                        None => {}
-                    }
+                    let code = match self.get_function(name.clone()) {
+                        Some(func) => func.code,
+                        None => String::new(),
+                    };
+                    Executor::new(&self.memory, &self.name_space).execute_block(&code);
                 } else if lines.contains("for") {
                     println!("ループ回数を求めます");
                     let new_lines = lines.replacen("for", "", 1);
@@ -563,8 +561,10 @@ impl Executor {
         }
     }
 
+    /// 変数の値をセットする
     fn set_variable(&mut self, name: String, expr: String) {
         let is_duplicate = {
+            //変数が既に在るか？
             let mut flag = false;
             for item in self.memory.iter() {
                 if item.name == name.trim().replace(" ", "") {
@@ -579,13 +579,33 @@ impl Executor {
         };
 
         if is_duplicate {
+            //　変数は在る場合は更新する
             let address = self.reference_variable(name).unwrap_or(0);
             self.memory[address].expr = expr.clone();
             self.memory[address].value = self.compute(expr.clone());
         } else {
+            //ない場合は新規に確保する
             let value = self.compute(expr.clone());
             self.memory.push(Variable { name, value, expr });
         }
+    }
+
+    // 変数を取得する
+    fn get_variable(&mut self, name: String) -> Option<Variable> {
+        let index = match self.reference_variable(name) {
+            Some(i) => i,
+            None => return None,
+        };
+        return Some(self.memory[index].clone());
+    }
+
+    //　関数を取得する
+    fn get_function(&mut self, name: String) -> Option<Func> {
+        let index = match self.reference_function(name) {
+            Some(i) => i,
+            None => return None,
+        };
+        return Some(self.name_space[index].clone());
     }
 
     /// 式の計算
@@ -629,26 +649,25 @@ impl Executor {
 
                             if item.contains("(") || item.contains(")") {
                                 let name = item.replace("(", "").replace(")", "");
-                                match self.reference_function(name.clone()) {
-                                    Some(index) => stack.push({
-                                        println!("関数{name}を呼び出します");
-                                        match Executor::new(&self.memory, &self.name_space)
-                                            .execute_block(&self.name_space[index].code)
-                                        {
-                                            Some(indes) => indes,
-                                            None => 0.0,
-                                        }
-                                    }),
-                                    None => {}
-                                }
-                            } else {
-                                match self.reference_variable(item.to_string()) {
-                                    Some(index) => {
-                                        println!("変数{item}を参照します");
-                                        stack.push(self.memory[index].value);
+                                let code = match self.get_function(name.clone()) {
+                                    Some(func) => func.code,
+                                    None => String::new(),
+                                };
+                                stack.push({
+                                    println!("関数{name}を呼び出します");
+                                    match Executor::new(&self.memory, &self.name_space)
+                                        .execute_block(&code)
+                                    {
+                                        Some(indes) => indes,
+                                        None => 0.0,
                                     }
-                                    None => {}
-                                }
+                                })
+                            } else {
+                                println!("変数{item}を参照します");
+                                stack.push(match self.get_variable(item.to_string()) {
+                                    Some(vars) => vars.value,
+                                    None => 0.0,
+                                });
                             }
                         }
                     }
