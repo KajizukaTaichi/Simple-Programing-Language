@@ -26,7 +26,7 @@ pub struct Variable {
 
 /// 関数のデータ
 #[derive(Clone)]
-pub struct Func {
+pub struct Function {
     name: String,
     code: String,
 }
@@ -38,30 +38,30 @@ enum Mode {
     Else,
     For,
     While,
-    Func,
+    Function,
     Normal,
 }
 
 /// コードを実行を管理
 pub struct Executor {
-    memory: Vec<Variable>, //メモリの変数
-    name_space: Vec<Func>, // 関数
-    stmt: String,          // ブロックのステートメント
-    else_stmt: String,     // elseステートメント
-    count: usize,          // ループカウンタ
-    name: String,          // 関数の名前
-    expr: String,          // 条件式
-    mode: Mode,            // 制御ブロックの状態
-    old_mode: Mode,        // 元のモード
-    nest_if: usize,        // ifネストの階層を表す
-    nest_for: usize,       // forネストの階層を表す
-    nest_while: usize,     // whileネストの階層を表す
-    nest_func: usize,      // funcネストの階層を表す
+    memory: Vec<Variable>,     //メモリの変数
+    name_space: Vec<Function>, // 関数
+    stmt: String,              // ブロックのステートメント
+    else_stmt: String,         // elseステートメント
+    count: usize,              // ループカウンタ
+    name: String,              // 関数の名前
+    expr: String,              // 条件式
+    mode: Mode,                // 制御ブロックの状態
+    old_mode: Mode,            // 元のモード
+    nest_if: usize,            // ifネストの階層を表す
+    nest_for: usize,           // forネストの階層を表す
+    nest_while: usize,         // whileネストの階層を表す
+    nest_func: usize,          // funcネストの階層を表す
 }
 
 impl Executor {
     /// コンストラクタ
-    pub fn new(memory: &Vec<Variable>, name_space: &Vec<Func>) -> Executor {
+    pub fn new(memory: &Vec<Variable>, name_space: &Vec<Function>) -> Executor {
         Executor {
             memory: memory.to_owned(),
             name_space: name_space.to_owned(),
@@ -260,17 +260,14 @@ impl Executor {
                 }
             }
 
-            Mode::Func => {
+            Mode::Function => {
                 if lines.contains("end func") {
                     if self.nest_func > 0 {
                         self.nest_func -= 1;
                         self.stmt += lines;
                         self.stmt += "\n";
                     } else {
-                        self.name_space.push(Func {
-                            name: self.name.clone(),
-                            code: self.stmt.clone(),
-                        });
+                        self.set_function(self.name.clone(), self.stmt.clone());
                         self.stmt = String::new();
                         self.mode = Mode::Normal;
                     }
@@ -298,30 +295,18 @@ impl Executor {
                     // 変数の式の再計算
                     let new_lines = lines.replacen("calc", "", 1);
                     let name = &new_lines;
-                    match self.reference_variable(name.to_string()) {
-                        Some(index) => {
-                            let value = self.compute(self.memory[index].to_owned().expr);
-                            self.memory[index].value = value;
-                            println!("再計算を実行しました");
-                        }
-                        None => {}
-                    }
+                    let expr = self.get_variable_expr(name.to_string());
+                    self.set_variable(name.to_string(), expr);
+                    println!("再計算を実行しました");
                 } else if lines.contains("func") {
                     //　関数の定義
                     let new_lines = lines.trim().replacen("func", "", 1).replace(" ", "");
                     self.name = new_lines.replace(" ", "").replace("(", "").replace(")", "");
                     println!("関数{}を定義します", self.name);
-                    self.mode = Mode::Func;
+                    self.mode = Mode::Function;
                 } else if lines.contains("call") {
                     // 関数呼び出し
-                    let new_lines = lines.replacen("call", "", 1);
-                    let name = &new_lines.replace(" ", "").replace("(", "").replace(")", "");
-                    println!("関数{name}を呼び出します");
-                    let code = match self.get_function(name.clone()) {
-                        Some(func) => func.code,
-                        None => String::new(),
-                    };
-                    Executor::new(&self.memory, &self.name_space).execute_block(&code);
+                    self.call_function(lines.replacen("call", "", 1));
                 } else if lines.contains("for") {
                     println!("ループ回数を求めます");
                     let new_lines = lines.replacen("for", "", 1);
@@ -471,7 +456,7 @@ impl Executor {
                         Mode::For => "Forループ",
                         Mode::While => "Whileループ",
                         Mode::Normal => "プログラム",
-                        Mode::Func => "関数定義",
+                        Mode::Function => "関数定義",
                     }
                 )
                 .as_str(),
@@ -531,7 +516,7 @@ impl Executor {
 
     /// 変数の参照
     fn reference_variable(&self, name: String) -> Option<usize> {
-        let name = name.trim().replace(" ", "");
+        let name = name.trim().replace(" ", "").replace("　", "");
         match self
             .memory
             .iter()
@@ -545,9 +530,55 @@ impl Executor {
         }
     }
 
+    ///　関数を呼び出す
+    fn call_function(&mut self, name: String) -> f64 {
+        let name = name
+            .replace(" ", "")
+            .replace("　", "")
+            .replace("(", "")
+            .replace(")", "");
+        let code = match self.get_function(name.clone()) {
+            Some(func) => func.code,
+            None => String::new(),
+        };
+        println!("関数{name}を呼び出します");
+        match Executor::new(&self.memory, &self.name_space).execute_block(&code) {
+            Some(indes) => indes,
+            None => 0.0,
+        }
+    }
+
+    /// 関数を定義する
+    fn set_function(&mut self, name: String, code: String) {
+        let name = name.trim().replace(" ", "").replace("　", "");
+        let is_duplicate = {
+            //関数が既に在るか？
+            let mut flag = false;
+            for item in self.name_space.iter() {
+                if item.name == name.trim().replace(" ", "") {
+                    flag = true;
+                }
+            }
+            if flag {
+                true
+            } else {
+                false
+            }
+        };
+
+        if is_duplicate {
+            //　関数が在る場合は更新する
+            let address = self.reference_function(name).unwrap_or(0);
+            self.name_space[address].code = code.clone();
+        } else {
+            //ない場合は新規に確保する
+            self.name_space.push(Function { name, code });
+        }
+    }
+
     /// 関数の参照
     fn reference_function(&self, name: String) -> Option<usize> {
-        let name = name.trim().replace(" ", "");
+        let name = name.trim().replace(" ", "").replace("　", "");
         match self
             .name_space
             .iter()
@@ -563,6 +594,7 @@ impl Executor {
 
     /// 変数の値をセットする
     fn set_variable(&mut self, name: String, expr: String) {
+        let name = name.trim().replace(" ", "").replace("　", "");
         let is_duplicate = {
             //変数が既に在るか？
             let mut flag = false;
@@ -579,7 +611,7 @@ impl Executor {
         };
 
         if is_duplicate {
-            //　変数は在る場合は更新する
+            //　変数が在る場合は更新する
             let address = self.reference_variable(name).unwrap_or(0);
             self.memory[address].expr = expr.clone();
             self.memory[address].value = self.compute(expr.clone());
@@ -590,8 +622,9 @@ impl Executor {
         }
     }
 
-    // 変数を取得する
+    /// 変数を取得する
     fn get_variable(&mut self, name: String) -> Option<Variable> {
+        let name = name.trim().replace(" ", "").replace("　", "");
         let index = match self.reference_variable(name) {
             Some(i) => i,
             None => return None,
@@ -599,8 +632,26 @@ impl Executor {
         return Some(self.memory[index].clone());
     }
 
-    //　関数を取得する
-    fn get_function(&mut self, name: String) -> Option<Func> {
+    /// 変数の値を取得する
+    fn get_variable_value(&mut self, name: String) -> f64 {
+        println!("変数{name}を参照します");
+        match self.get_variable(name) {
+            Some(i) => i.value,
+            None => return 0.0,
+        }
+    }
+
+    /// 変数の式を取得する
+    fn get_variable_expr(&mut self, name: String) -> String {
+        println!("変数{name}を参照します");
+        match self.get_variable(name) {
+            Some(i) => i.expr,
+            None => return "".to_string(),
+        }
+    }
+
+    /// 関数を取得する
+    fn get_function(&mut self, name: String) -> Option<Function> {
         let index = match self.reference_function(name) {
             Some(i) => i,
             None => return None,
@@ -648,26 +699,9 @@ impl Executor {
                             stack.push(y);
 
                             if item.contains("(") || item.contains(")") {
-                                let name = item.replace("(", "").replace(")", "");
-                                let code = match self.get_function(name.clone()) {
-                                    Some(func) => func.code,
-                                    None => String::new(),
-                                };
-                                stack.push({
-                                    println!("関数{name}を呼び出します");
-                                    match Executor::new(&self.memory, &self.name_space)
-                                        .execute_block(&code)
-                                    {
-                                        Some(indes) => indes,
-                                        None => 0.0,
-                                    }
-                                })
+                                stack.push(self.call_function(item.to_string()))
                             } else {
-                                println!("変数{item}を参照します");
-                                stack.push(match self.get_variable(item.to_string()) {
-                                    Some(vars) => vars.value,
-                                    None => 0.0,
-                                });
+                                stack.push(self.get_variable_value(item.to_string()));
                             }
                         }
                     }
