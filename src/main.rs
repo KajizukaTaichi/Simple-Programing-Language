@@ -18,7 +18,7 @@ fn main() {
     let message = "Simple プログラミング言語\nコンピュータの動作原理やロジックを学べます\n(c) 2023 梶塚太智. All rights reserved";
     let args = env::args().collect::<Vec<_>>();
 
-    let mut executor = executor::Executor::new(&Vec::new(), &Vec::new(), true);
+    let mut executor = executor::Executor::new(&mut Vec::new(), &mut Vec::new(), true);
     if args.len() >= 3 {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
@@ -47,7 +47,7 @@ fn main() {
         }
         match get_file_contents(args[1].to_string()) {
             Ok(code) => {
-                executor.execute_block(&code);
+                executor.script(&code);
             }
             Err(e) => {
                 eprintln!("エラー! :{}", e);

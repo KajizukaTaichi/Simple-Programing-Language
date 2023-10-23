@@ -62,7 +62,7 @@ pub struct Executor {
 
 impl Executor {
     /// コンストラクタ
-    pub fn new(memory: &Vec<Variable>, name_space: &Vec<Function>, log: bool) -> Executor {
+    pub fn new(memory: &mut Vec<Variable>, name_space: &mut Vec<Function>, log: bool) -> Executor {
         Executor {
             memory: memory.to_owned(),
             name_space: name_space.to_owned(),
@@ -97,8 +97,9 @@ impl Executor {
                             if self.log {
                                 println!("{}回目のループ", i + 1);
                             }
-                            let status = Executor::new(&self.memory, &self.name_space, self.log)
-                                .execute_block(&self.stmt);
+                            let status =
+                                Executor::new(&mut self.memory, &mut self.name_space, self.log)
+                                    .execute_block(&mut self.stmt);
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -146,8 +147,9 @@ impl Executor {
                             if self.log {
                                 println!("条件が一致したので、実行します");
                             }
-                            let status = Executor::new(&self.memory, &self.name_space, self.log)
-                                .execute_block(&self.stmt);
+                            let status =
+                                Executor::new(&mut self.memory, &mut self.name_space, self.log)
+                                    .execute_block(&mut self.stmt);
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -193,8 +195,9 @@ impl Executor {
                             if self.log {
                                 println!("条件が一致しなかったので、elseのコードを実行します");
                             }
-                            let status = Executor::new(&self.memory, &self.name_space, self.log)
-                                .execute_block(&self.else_stmt);
+                            let status =
+                                Executor::new(&mut self.memory, &mut self.name_space, self.log)
+                                    .execute_block(&mut self.else_stmt);
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -211,8 +214,9 @@ impl Executor {
                             if self.log {
                                 println!("条件が一致したので、実行します");
                             }
-                            let status = Executor::new(&self.memory, &self.name_space, self.log)
-                                .execute_block(&self.stmt);
+                            let status =
+                                Executor::new(&mut self.memory, &mut self.name_space, self.log)
+                                    .execute_block(&mut self.stmt);
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -258,8 +262,8 @@ impl Executor {
                                     println!("条件が一致したので、ループを継続します");
                                 }
                                 let status =
-                                    Executor::new(&self.memory, &self.name_space, self.log)
-                                        .execute_block(&self.stmt);
+                                    Executor::new(&mut self.memory, &mut self.name_space, self.log)
+                                        .execute_block(&mut self.stmt);
                                 match status {
                                     Some(i) => {
                                         if i == f64::MAX {
@@ -606,7 +610,7 @@ impl Executor {
     }
 
     /// 変数の参照
-    fn reference_variable(&self, name: String) -> Option<usize> {
+    fn reference_variable(&mut self, name: String) -> Option<usize> {
         let name = name.trim().replace(" ", "").replace("　", "");
         match self
             .memory
@@ -637,7 +641,7 @@ impl Executor {
         if self.log {
             println!("関数{name}を呼び出します");
         }
-        match Executor::new(&self.memory, &self.name_space, self.log).execute_block(&code) {
+        match Executor::new(&mut self.memory, &mut self.name_space, self.log).execute_block(&code) {
             Some(indes) => indes,
             None => 0.0,
         }
@@ -668,7 +672,7 @@ impl Executor {
     }
 
     /// 関数の参照
-    fn reference_function(&self, name: String) -> Option<usize> {
+    fn reference_function(&mut self, name: String) -> Option<usize> {
         let name = name.trim().replace(" ", "").replace("　", "");
         match self
             .name_space
