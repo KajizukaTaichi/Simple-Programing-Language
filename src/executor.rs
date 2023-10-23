@@ -44,13 +44,14 @@ enum Mode {
 
 /// コードを実行を管理
 pub struct Executor {
-    memory: Vec<Variable>,     //メモリの変数
-    name_space: Vec<Function>, // 関数
+    memory: Vec<Variable>,     //　メモリ内の変数
+    name_space: Vec<Function>, // 関数の名前空間
     stmt: String,              // ブロックのステートメント
     else_stmt: String,         // elseステートメント
     count: usize,              // ループカウンタ
     name: String,              // 関数の名前
     expr: String,              // 条件式
+    log: bool,                 // ログ出力
     mode: Mode,                // 制御ブロックの状態
     old_mode: Mode,            // 元のモード
     nest_if: usize,            // ifネストの階層を表す
@@ -61,7 +62,7 @@ pub struct Executor {
 
 impl Executor {
     /// コンストラクタ
-    pub fn new(memory: &Vec<Variable>, name_space: &Vec<Function>) -> Executor {
+    pub fn new(memory: &Vec<Variable>, name_space: &Vec<Function>, log: bool) -> Executor {
         Executor {
             memory: memory.to_owned(),
             name_space: name_space.to_owned(),
@@ -70,6 +71,7 @@ impl Executor {
             count: 0,
             name: "".to_string(),
             expr: "".to_string(),
+            log,
             mode: Mode::Normal,
             old_mode: Mode::Normal,
             nest_if: 0,
@@ -92,8 +94,10 @@ impl Executor {
                         self.stmt += "\n";
                     } else {
                         for i in 0..self.count {
-                            println!("{}回目のループ", i + 1);
-                            let status = Executor::new(&self.memory, &self.name_space)
+                            if self.log {
+                                println!("{}回目のループ", i + 1);
+                            }
+                            let status = Executor::new(&self.memory, &self.name_space, self.log)
                                 .execute_block(&self.stmt);
                             match status {
                                 Some(i) => {
@@ -135,10 +139,14 @@ impl Executor {
                         self.stmt += "\n";
                     } else {
                         // 条件式を評価する
-                        println!("ifの条件式を評価します");
+                        if self.log {
+                            println!("ifの条件式を評価します");
+                        }
                         if self.compute(self.expr.clone()) != 0.0 {
-                            println!("条件が一致したので、実行します");
-                            let status = Executor::new(&self.memory, &self.name_space)
+                            if self.log {
+                                println!("条件が一致したので、実行します");
+                            }
+                            let status = Executor::new(&self.memory, &self.name_space, self.log)
                                 .execute_block(&self.stmt);
                             match status {
                                 Some(i) => {
@@ -154,7 +162,9 @@ impl Executor {
                             }
                             self.stmt = String::new();
                         } else {
-                            println!("条件が一致しなかったので、実行しません");
+                            if self.log {
+                                println!("条件が一致しなかったので、実行しません");
+                            }
                             self.stmt = String::new();
                         }
                         self.mode = Mode::Normal;
@@ -176,10 +186,14 @@ impl Executor {
                         self.stmt += lines;
                         self.stmt += "\n";
                     } else {
-                        println!("ifの条件式を評価します");
+                        if self.log {
+                            println!("ifの条件式を評価します");
+                        }
                         if self.compute(self.expr.clone()) == 0.0 {
-                            println!("条件が一致しなかったので、elseのコードを実行します");
-                            let status = Executor::new(&self.memory, &self.name_space)
+                            if self.log {
+                                println!("条件が一致しなかったので、elseのコードを実行します");
+                            }
+                            let status = Executor::new(&self.memory, &self.name_space, self.log)
                                 .execute_block(&self.else_stmt);
                             match status {
                                 Some(i) => {
@@ -194,8 +208,10 @@ impl Executor {
                             self.else_stmt = String::new();
                             self.stmt = String::new();
                         } else {
-                            println!("条件が一致したので、実行します");
-                            let status = Executor::new(&self.memory, &self.name_space)
+                            if self.log {
+                                println!("条件が一致したので、実行します");
+                            }
+                            let status = Executor::new(&self.memory, &self.name_space, self.log)
                                 .execute_block(&self.stmt);
                             match status {
                                 Some(i) => {
@@ -228,15 +244,22 @@ impl Executor {
                         self.nest_while -= 1;
                     } else {
                         loop {
-                            println!("whileの条件式を評価します");
+                            if self.log {
+                                println!("whileの条件式を評価します");
+                            }
                             if self.compute(self.expr.trim().to_string()) == 0.0 {
                                 self.stmt = String::new();
-                                println!("条件が一致しなかったので、ループを脱出します");
+                                if self.log {
+                                    println!("条件が一致しなかったので、ループを脱出します");
+                                }
                                 break;
                             } else {
-                                println!("条件が一致したので、ループを継続します");
-                                let status = Executor::new(&self.memory, &self.name_space)
-                                    .execute_block(&self.stmt);
+                                if self.log {
+                                    println!("条件が一致したので、ループを継続します");
+                                }
+                                let status =
+                                    Executor::new(&self.memory, &self.name_space, self.log)
+                                        .execute_block(&self.stmt);
                                 match status {
                                     Some(i) => {
                                         if i == f64::MAX {
@@ -285,7 +308,9 @@ impl Executor {
                     let new_lines = lines.replacen("var", "", 1);
                     let lines = &new_lines;
                     let params: Vec<&str> = lines.split("=").collect();
-                    println!("変数{}を定義しています", params[0].trim().replace(" ", ""));
+                    if self.log {
+                        println!("変数{}を定義しています", params[0].trim().replace(" ", ""));
+                    }
 
                     self.set_variable(
                         params[0].trim().replace(" ", ""),
@@ -297,18 +322,24 @@ impl Executor {
                     let name = &new_lines;
                     let expr = self.get_variable_expr(name.to_string());
                     self.set_variable(name.to_string(), expr);
-                    println!("再計算を実行しました");
+                    if self.log {
+                        println!("再計算を実行しました");
+                    }
                 } else if lines.contains("func") {
                     //　関数の定義
                     let new_lines = lines.trim().replacen("func", "", 1).replace(" ", "");
                     self.name = new_lines.replace(" ", "").replace("(", "").replace(")", "");
-                    println!("関数{}を定義します", self.name);
+                    if self.log {
+                        println!("関数{}を定義します", self.name);
+                    }
                     self.mode = Mode::Function;
                 } else if lines.contains("call") {
                     // 関数呼び出し
                     self.call_function(lines.replacen("call", "", 1));
                 } else if lines.contains("for") {
-                    println!("ループ回数を求めます");
+                    if self.log {
+                        println!("ループ回数を求めます");
+                    }
                     let new_lines = lines.replacen("for", "", 1);
                     self.count = self.compute(new_lines).round() as usize; // ループ回数
                     self.old_mode = self.mode.clone();
@@ -327,13 +358,21 @@ impl Executor {
                     // 標準入力
                     let new_lines = lines.replacen("input", "", 1);
                     let name = &new_lines;
-                    let inputed = input("[入力]> ");
+                    let inputed = if self.log {
+                        println!("標準入力を受け取ります");
+                        input("[入力]> ")
+                    } else {
+                        input("> ")
+                    };
                     self.set_variable(name.trim().replace(" ", ""), inputed.to_string());
                 } else if lines.contains("print") {
                     //　標準出力
                     let new_lines = lines.replacen("print", "", 1);
                     let mut text = String::new();
                     let params = &new_lines;
+                    if self.log {
+                        println!("標準出力に表示します");
+                    }
                     for i in params.split(",").collect::<Vec<&str>>() {
                         if i.contains("'") || i.contains("\"") {
                             //文字列か？
@@ -343,10 +382,16 @@ impl Executor {
                             text += self.compute(i.trim().to_string()).to_string().as_str();
                         }
                     }
-                    println!("[出力]: {text}");
-                } else if lines.find("mem").is_some() {
+                    if self.log {
+                        println!("[出力]: {text}");
+                    } else {
+                        println!("{text}");
+                    }
+                } else if lines.contains("mem") {
                     if self.memory.len() != 0 {
-                        println!("+-- メモリ内の変数 --");
+                        if self.log {
+                            println!("+-- メモリ内の変数 --");
+                        }
                         for i in self.memory.iter() {
                             println!(
                                 "| name: '{}' - expr: [{}] - value: {}",
@@ -354,22 +399,32 @@ impl Executor {
                             )
                         }
                     } else {
-                        println!("変数がありません");
+                        if self.log {
+                            println!("変数がありません");
+                        }
                     }
                     if self.name_space.len() != 0 {
-                        println!("+-- メモリ内の関数 --");
+                        if self.log {
+                            println!("+-- メモリ内の関数 --");
+                        }
                         for i in self.name_space.iter() {
-                            println!("|+-- name: '{}' - len: {}", i.name, i.code.len());
+                            if self.log {
+                                println!("|+-- name: '{}' - len: {}", i.name, i.code.len());
+                            }
                             let mut number = 0; //行数
                             for j in i.code.split('\n') {
                                 if j != "" {
                                     number += 1;
-                                    println!("|| [{number}]: {j}");
+                                    if self.log {
+                                        println!("|| [{number}]: {j}");
+                                    }
                                 }
                             }
                         }
                     } else {
-                        println!("関数がありません");
+                        if self.log {
+                            println!("関数がありません");
+                        }
                     }
                 } else if lines.contains("del") {
                     // 変数や関数の削除
@@ -378,14 +433,18 @@ impl Executor {
                     match self.reference_variable(name.clone()) {
                         Some(index) => {
                             self.memory.remove(index);
-                            println!("変数{}を削除しました", name);
+                            if self.log {
+                                println!("変数{}を削除しました", name);
+                            }
                         }
                         None => {}
                     }
                     match self.reference_function(name.to_owned()) {
                         Some(index) => {
                             self.name_space.remove(index);
-                            println!("関数{}を削除しました", name);
+                            if self.log {
+                                println!("関数{}を削除しました", name);
+                            }
                         }
                         None => {}
                     }
@@ -401,32 +460,46 @@ impl Executor {
                         let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                         let temp: i64 = rng.gen_range(
                             self.compute({
-                                println!("最小値を求めます");
+                                if self.log {
+                                    println!("最小値を求めます");
+                                }
                                 String::from(params[1])
                             })
                             .round() as i64,
                             self.compute({
-                                println!("最大値を求めます");
+                                if self.log {
+                                    println!("最大値を求めます");
+                                }
                                 String::from(params[2])
                             })
                             .round() as i64,
                         );
                         self.set_variable(params[0].trim().replace(" ", ""), temp.to_string());
                     }
-                    println!("乱数を生成しました");
+                    if self.log {
+                        println!("乱数を生成しました");
+                    }
                 } else if lines.contains("return") {
                     let return_value = lines.replacen("return", "", 1);
-                    println!("戻り値を返します");
+                    if self.log {
+                        println!("戻り値を返します");
+                    }
                     return Some(self.compute(return_value));
                 } else if lines.contains("break") {
-                    println!("ループを脱出します");
+                    if self.log {
+                        println!("ループを脱出します");
+                    }
                     return Some(f64::MAX); //ステータスコード
                 } else if lines == "exit" {
-                    println!("プロセスを終了します");
+                    if self.log {
+                        println!("プロセスを終了します");
+                    }
                     exit(0);
                 } else if lines == "" {
                 } else {
-                    println!("コマンドが不正です: {}", lines)
+                    if self.log {
+                        println!("コマンドが不正です: {}", lines)
+                    }
                 }
             }
         }
@@ -446,6 +519,7 @@ impl Executor {
 
     /// REPLで対話的に実行する
     pub fn interactive(&mut self) {
+        self.log = true;
         loop {
             let code = input(
                 format!(
@@ -465,15 +539,22 @@ impl Executor {
         }
     }
 
+    /// スクリプトを実行する
+    pub fn script(&mut self, code: &String) {
+        self.log = false;
+        self.execute_block(code);
+    }
+
     /// ファイルをデバッグする
     pub fn debug(&mut self, code: &String) {
+        self.log = true;
         for lin in code.split("\n") {
             self.execute(lin.to_string());
 
             // デバッグメニューを表示する
             loop {
                 let menu = input("デバッグメニュー>>> ");
-                if menu.find("var").is_some() {
+                if menu.contains("var") {
                     let lim = &menu.replacen("var", "", 1);
                     let params: Vec<&str> = lim.split("=").collect();
                     let value = self.compute(params[1..].join("=").to_string());
@@ -483,9 +564,11 @@ impl Executor {
                         value,
                         expr: params[1..].join("=").to_string(),
                     });
-                } else if menu.find("mem").is_some() {
+                } else if menu.contains("mem") {
                     if self.memory.len() != 0 {
-                        println!("+-- メモリ内の変数 --");
+                        if self.log {
+                            println!("+-- メモリ内の変数 --");
+                        }
                         for i in self.memory.iter() {
                             println!(
                                 "| name: '{}' - expr: [{}] - value: {}",
@@ -493,17 +576,25 @@ impl Executor {
                             )
                         }
                     } else {
-                        println!("変数がありません");
+                        if self.log {
+                            println!("変数がありません");
+                        }
                     }
                     if self.name_space.len() != 0 {
-                        println!("+-- メモリ内の関数 --");
+                        if self.log {
+                            println!("+-- メモリ内の関数 --");
+                        }
                         for i in self.name_space.iter() {
-                            println!("| name: '{}' - len: {}", i.name, i.code.len());
+                            if self.log {
+                                println!("| name: '{}' - len: {}", i.name, i.code.len());
+                            }
                         }
                     } else {
-                        println!("関数がありません");
+                        if self.log {
+                            println!("関数がありません");
+                        }
                     }
-                } else if menu.find("exit").is_some() {
+                } else if menu.contains("exit") {
                     input("デバッグを中断します");
                     exit(0);
                 } else {
@@ -524,7 +615,9 @@ impl Executor {
         {
             Some(index) => Some(index),
             None => {
-                println!("変数{name}が見つかりません");
+                if self.log {
+                    println!("変数{name}が見つかりません");
+                }
                 None
             }
         }
@@ -539,10 +632,12 @@ impl Executor {
             .replace(")", "");
         let code = match self.get_function(name.clone()) {
             Some(func) => func.code,
-            None => String::new(),
+            None => return 0.0,
         };
-        println!("関数{name}を呼び出します");
-        match Executor::new(&self.memory, &self.name_space).execute_block(&code) {
+        if self.log {
+            println!("関数{name}を呼び出します");
+        }
+        match Executor::new(&self.memory, &self.name_space, self.log).execute_block(&code) {
             Some(indes) => indes,
             None => 0.0,
         }
@@ -559,11 +654,7 @@ impl Executor {
                     flag = true;
                 }
             }
-            if flag {
-                true
-            } else {
-                false
-            }
+            flag
         };
 
         if is_duplicate {
@@ -586,7 +677,9 @@ impl Executor {
         {
             Some(index) => Some(index),
             None => {
-                println!("関数{name}が見つかりません");
+                if self.log {
+                    println!("関数{name}が見つかりません");
+                }
                 None
             }
         }
@@ -603,11 +696,7 @@ impl Executor {
                     flag = true;
                 }
             }
-            if flag {
-                true
-            } else {
-                false
-            }
+            flag
         };
 
         if is_duplicate {
@@ -634,7 +723,9 @@ impl Executor {
 
     /// 変数の値を取得する
     fn get_variable_value(&mut self, name: String) -> f64 {
-        println!("変数{name}を参照します");
+        if self.log {
+            println!("変数{name}を参照します");
+        }
         match self.get_variable(name) {
             Some(i) => i.value,
             None => return 0.0,
@@ -643,7 +734,9 @@ impl Executor {
 
     /// 変数の式を取得する
     fn get_variable_expr(&mut self, name: String) -> String {
-        println!("変数{name}を参照します");
+        if self.log {
+            println!("変数{name}を参照します");
+        }
         match self.get_variable(name) {
             Some(i) => i.expr,
             None => return "".to_string(),
@@ -663,13 +756,17 @@ impl Executor {
     fn compute(&mut self, expr: String) -> f64 {
         let mut stack: Vec<f64> = Vec::new();
         let tokens = expr.split_whitespace();
-        println!("+-- 計算処理 --");
+        if self.log {
+            println!("+-- 計算処理 --");
+        }
         for item in tokens {
             let item = item.trim();
             if item.is_empty() {
                 continue;
             }
-            println!("| Stack: {:?}  <=  '{}'", stack, item);
+            if self.log {
+                println!("| Stack: {:?}  <=  '{}'", stack, item);
+            }
             match item.parse::<f64>() {
                 Ok(number) => {
                     stack.push(number);
@@ -679,18 +776,18 @@ impl Executor {
                     let y = stack.pop().unwrap_or(0.0);
                     let x = stack.pop().unwrap_or(0.0);
                     match item {
-                        "+" => stack.push(x + y),
-                        "-" => stack.push(x - y),
-                        "*" => stack.push(x * y),
-                        "/" => stack.push(x / y),
-                        "%" => stack.push(x % y),
-                        "^" => stack.push(x.powf(y)),
-                        "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
-                        "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
-                        "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
-                        ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
-                        "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
-                        "!" => {
+                        "+" | "＋" => stack.push(x + y),
+                        "-" | "ー" => stack.push(x - y),
+                        "*" | "＊" | "×" => stack.push(x * y),
+                        "/" | "÷" => stack.push(x / y),
+                        "%" | "％" => stack.push(x % y),
+                        "^" | "＾" => stack.push(x.powf(y)),
+                        "=" | "＝" => stack.push(if x == y { 1.0 } else { 0.0 }),
+                        "&" | "＆" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
+                        "|" | "｜" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
+                        ">" | "＞" => stack.push(if x > y { 1.0 } else { 0.0 }),
+                        "<" | "＜" => stack.push(if x < y { 1.0 } else { 0.0 }),
+                        "!" | "！" => {
                             stack.push(x);
                             stack.push(if y == 0.0 { 1.0 } else { 0.0 })
                         }
@@ -709,7 +806,9 @@ impl Executor {
             };
         }
         let result = stack.pop().unwrap_or(0.0);
-        println!("結果 = {}", result);
+        if self.log {
+            println!("結果 = {}", result);
+        }
         return result;
     }
 }

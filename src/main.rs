@@ -3,6 +3,9 @@ use std::fs::File;
 use std::io::{Error, Read};
 mod executor;
 
+#[cfg(test)]
+mod tests; //テストモジュールを読み込む
+
 /// ファイルを読み込む
 fn get_file_contents(name: String) -> Result<String, Error> {
     let mut f = File::open(name.trim())?;
@@ -15,14 +18,14 @@ fn main() {
     let message = "Simple プログラミング言語\nコンピュータの動作原理やロジックを学べます\n(c) 2023 梶塚太智. All rights reserved";
     let args = env::args().collect::<Vec<_>>();
 
-    let mut executor = executor::Executor::new(&Vec::new(), &Vec::new());
+    let mut executor = executor::Executor::new(&Vec::new(), &Vec::new(), true);
     if args.len() >= 3 {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
             Ok(code) => {
                 if args[1] == "run" || args[1] == "r" {
                     println!("{message}");
-                    executor.execute_block(&code);
+                    executor.script(&code);
                 } else if args[1] == "debug" || args[1] == "d" {
                     println!("{}をデバッグします", args[2]);
                     executor.debug(&code);
