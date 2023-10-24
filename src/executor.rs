@@ -43,29 +43,33 @@ enum Mode {
 }
 
 /// コードを実行を管理
-pub struct Executor {
-    memory: Vec<Variable>,     //　メモリ内の変数
-    name_space: Vec<Function>, // 関数の名前空間
-    stmt: String,              // ブロックのステートメント
-    else_stmt: String,         // elseステートメント
-    count: usize,              // ループカウンタ
-    name: String,              // 関数の名前
-    expr: String,              // 条件式
-    log: bool,                 // ログ出力
-    mode: Mode,                // 制御ブロックの状態
-    old_mode: Mode,            // 元のモード
-    nest_if: usize,            // ifネストの階層を表す
-    nest_for: usize,           // forネストの階層を表す
-    nest_while: usize,         // whileネストの階層を表す
-    nest_func: usize,          // funcネストの階層を表す
+pub struct Executor<'a> {
+    memory: &'a mut Vec<Variable>,     //　メモリ内の変数
+    name_space: &'a mut Vec<Function>, // 関数の名前空間
+    stmt: String,                      // ブロックのステートメント
+    else_stmt: String,                 // elseステートメント
+    count: usize,                      // ループカウンタ
+    name: String,                      // 関数の名前
+    expr: String,                      // 条件式
+    log: bool,                         // ログ出力
+    mode: Mode,                        // 制御ブロックの状態
+    old_mode: Mode,                    // 元のモード
+    nest_if: usize,                    // ifネストの階層を表す
+    nest_for: usize,                   // forネストの階層を表す
+    nest_while: usize,                 // whileネストの階層を表す
+    nest_func: usize,                  // funcネストの階層を表す
 }
 
-impl Executor {
+impl<'a> Executor<'a> {
     /// コンストラクタ
-    pub fn new(memory: &mut Vec<Variable>, name_space: &mut Vec<Function>, log: bool) -> Executor {
+    pub fn new(
+        memory: &'a mut Vec<Variable>,
+        name_space: &'a mut Vec<Function>,
+        log: bool,
+    ) -> Executor<'a> {
         Executor {
-            memory: memory.to_owned(),
-            name_space: name_space.to_owned(),
+            memory: memory,
+            name_space: name_space,
             stmt: "".to_string(),
             else_stmt: "".to_string(),
             count: 0,
@@ -392,7 +396,7 @@ impl Executor {
                         println!("{text}");
                     }
                 } else if lines.contains("mem") {
-                    if self.memory.len() != 0 {
+                    if !self.memory.is_empty() {
                         if self.log {
                             println!("+-- メモリ内の変数 --");
                         }
@@ -407,7 +411,7 @@ impl Executor {
                             println!("変数がありません");
                         }
                     }
-                    if self.name_space.len() != 0 {
+                    if !self.name_space.is_empty() {
                         if self.log {
                             println!("+-- メモリ内の関数 --");
                         }
@@ -561,15 +565,13 @@ impl Executor {
                 if menu.contains("var") {
                     let lim = &menu.replacen("var", "", 1);
                     let params: Vec<&str> = lim.split("=").collect();
-                    let value = self.compute(params[1..].join("=").to_string());
 
-                    self.memory.push(Variable {
-                        name: params[0].trim().replace(" ", ""),
-                        value,
-                        expr: params[1..].join("=").to_string(),
-                    });
+                    self.set_variable(
+                        params[0].trim().replace(" ", ""),
+                        params[1..].join("=").to_string(),
+                    );
                 } else if menu.contains("mem") {
-                    if self.memory.len() != 0 {
+                    if self.memory.is_empty() {
                         if self.log {
                             println!("+-- メモリ内の変数 --");
                         }
@@ -584,7 +586,7 @@ impl Executor {
                             println!("変数がありません");
                         }
                     }
-                    if self.name_space.len() != 0 {
+                    if self.name_space.is_empty() {
                         if self.log {
                             println!("+-- メモリ内の関数 --");
                         }

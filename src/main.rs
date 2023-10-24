@@ -17,8 +17,9 @@ fn get_file_contents(name: String) -> Result<String, Error> {
 fn main() {
     let message = "Simple プログラミング言語\nコンピュータの動作原理やロジックを学べます\n(c) 2023 梶塚太智. All rights reserved";
     let args = env::args().collect::<Vec<_>>();
-
-    let mut executor = executor::Executor::new(&mut Vec::new(), &mut Vec::new(), true);
+    let mut memory = Vec::new();
+    let mut name_space = Vec::new();
+    let mut executor = executor::Executor::new(&mut memory, &mut name_space, true);
     if args.len() >= 3 {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
