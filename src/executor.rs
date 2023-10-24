@@ -21,7 +21,6 @@ fn input(prompt: &str) -> String {
 pub struct Variable {
     name: String,
     value: f64,
-    expr: String,
 }
 
 /// 関数のデータ
@@ -317,22 +316,13 @@ impl<'a> Executor<'a> {
                     let lines = &new_lines;
                     let params: Vec<&str> = lines.split("=").collect();
                     if self.log {
-                        println!("変数{}を定義しています", params[0].trim().replace(" ", ""));
+                        println!("変数{}を定義します", params[0].trim().replace(" ", ""));
                     }
 
                     self.set_variable(
                         params[0].trim().replace(" ", ""),
                         params[1..].join("=").to_string(),
                     );
-                } else if lines.contains("calc") {
-                    // 変数の式の再計算
-                    let new_lines = lines.replacen("calc", "", 1);
-                    let name = &new_lines;
-                    let expr = self.get_variable_expr(name.to_string());
-                    self.set_variable(name.to_string(), expr);
-                    if self.log {
-                        println!("再計算を実行しました");
-                    }
                 } else if lines.contains("func") {
                     //　関数の定義
                     let new_lines = lines.trim().replacen("func", "", 1).replace(" ", "");
@@ -402,8 +392,8 @@ impl<'a> Executor<'a> {
                         }
                         for i in self.memory.iter() {
                             println!(
-                                "| name: '{}' - expr: [{}] - value: {}",
-                                i.name, i.expr, i.value
+                                "| address: {:p} - name: '{}' -  value: {}",
+                                i, i.name, i.value
                             )
                         }
                     } else {
@@ -417,7 +407,12 @@ impl<'a> Executor<'a> {
                         }
                         for i in self.name_space.iter() {
                             if self.log {
-                                println!("|+-- name: '{}' - len: {}", i.name, i.code.len());
+                                println!(
+                                    "|+--  address: {:p} - name: '{}' - len: {}",
+                                    i,
+                                    i.name,
+                                    i.code.len()
+                                );
                             }
                             let mut number = 0; //行数
                             for j in i.code.split('\n') {
@@ -576,10 +571,7 @@ impl<'a> Executor<'a> {
                             println!("+-- メモリ内の変数 --");
                         }
                         for i in self.memory.iter() {
-                            println!(
-                                "| name: '{}' - expr: [{}] - value: {}",
-                                i.name, i.expr, i.value
-                            )
+                            println!("| name: '{}'  - value: {}", i.name, i.value)
                         }
                     } else {
                         if self.log {
@@ -665,11 +657,20 @@ impl<'a> Executor<'a> {
 
         if is_duplicate {
             //　関数が在る場合は更新する
-            let address = self.reference_function(name).unwrap_or(0);
+            let address = self.reference_function(name.clone()).unwrap_or(0);
             self.name_space[address].code = code.clone();
+            if self.log {
+                println!("関数{name}のデータを更新しました");
+            }
         } else {
             //ない場合は新規に確保する
-            self.name_space.push(Function { name, code });
+            self.name_space.push(Function {
+                name: name.clone(),
+                code,
+            });
+            if self.log {
+                println!("メモリに関数を保存しました");
+            }
         }
     }
 
@@ -707,13 +708,27 @@ impl<'a> Executor<'a> {
 
         if is_duplicate {
             //　変数が在る場合は更新する
-            let address = self.reference_variable(name).unwrap_or(0);
-            self.memory[address].expr = expr.clone();
+            let address = self.reference_variable(name.clone()).unwrap_or(0);
+            if self.log {
+                println!("変数の値を求めます");
+            }
             self.memory[address].value = self.compute(expr.clone());
+            if self.log {
+                println!("変数{name}のデータを更新しました");
+            }
         } else {
             //ない場合は新規に確保する
+            if self.log {
+                println!("変数の値を求めます");
+            }
             let value = self.compute(expr.clone());
-            self.memory.push(Variable { name, value, expr });
+            self.memory.push(Variable {
+                name: name.clone(),
+                value,
+            });
+            if self.log {
+                println!("メモリに変数を確保しました");
+            }
         }
     }
 
@@ -738,17 +753,6 @@ impl<'a> Executor<'a> {
         }
     }
 
-    /// 変数の式を取得する
-    fn get_variable_expr(&mut self, name: String) -> String {
-        if self.log {
-            println!("変数{name}を参照します");
-        }
-        match self.get_variable(name) {
-            Some(i) => i.expr,
-            None => return "".to_string(),
-        }
-    }
-
     /// 関数を取得する
     fn get_function(&mut self, name: String) -> Option<Function> {
         let index = match self.reference_function(name) {
@@ -763,7 +767,7 @@ impl<'a> Executor<'a> {
         let mut stack: Vec<f64> = Vec::new();
         let tokens = expr.split_whitespace();
         if self.log {
-            println!("+-- 計算処理 --");
+            println!("+-- 式を計算します");
         }
         for item in tokens {
             let item = item.trim();
@@ -771,7 +775,7 @@ impl<'a> Executor<'a> {
                 continue;
             }
             if self.log {
-                println!("| Stack: {:?}  <=  '{}'", stack, item);
+                println!("| Stack: {:?}  ←  '{}'", stack, item);
             }
             match item.parse::<f64>() {
                 Ok(number) => {
@@ -782,18 +786,18 @@ impl<'a> Executor<'a> {
                     let y = stack.pop().unwrap_or(0.0);
                     let x = stack.pop().unwrap_or(0.0);
                     match item {
-                        "+" | "＋" => stack.push(x + y),
-                        "-" | "ー" => stack.push(x - y),
-                        "*" | "＊" | "×" => stack.push(x * y),
-                        "/" | "÷" => stack.push(x / y),
-                        "%" | "％" => stack.push(x % y),
-                        "^" | "＾" => stack.push(x.powf(y)),
-                        "=" | "＝" => stack.push(if x == y { 1.0 } else { 0.0 }),
-                        "&" | "＆" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
-                        "|" | "｜" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
-                        ">" | "＞" => stack.push(if x > y { 1.0 } else { 0.0 }),
-                        "<" | "＜" => stack.push(if x < y { 1.0 } else { 0.0 }),
-                        "!" | "！" => {
+                        "+" => stack.push(x + y),
+                        "-" => stack.push(x - y),
+                        "*" => stack.push(x * y),
+                        "/" => stack.push(x / y),
+                        "%" => stack.push(x % y),
+                        "^" => stack.push(x.powf(y)),
+                        "=" => stack.push(if x == y { 1.0 } else { 0.0 }),
+                        "&" => stack.push(if x != 0.0 && y != 0.0 { 1.0 } else { 0.0 }),
+                        "|" => stack.push(if x != 0.0 || y != 0.0 { 1.0 } else { 0.0 }),
+                        ">" => stack.push(if x > y { 1.0 } else { 0.0 }),
+                        "<" => stack.push(if x < y { 1.0 } else { 0.0 }),
+                        "!" => {
                             stack.push(x);
                             stack.push(if y == 0.0 { 1.0 } else { 0.0 })
                         }
