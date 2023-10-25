@@ -1,7 +1,7 @@
 var true = 1.0
 var false = 0.0
 
-func prime
+func prime()
     if number 2 <
         return false
     end if
@@ -40,9 +40,10 @@ while true
         break
     end if
 
-    if prime true =
+    if prime() true =
         print number,'は素数です'
     else
         print number,'は素数ではありません'
     end if
 end while
+ 
