@@ -639,13 +639,14 @@ impl<'a> Executor<'a> {
             .trim()
             .replacen("call", "", 1)
             .replace(")", "")
-            .replace(" ", "")
-            .replace("　", "")
             .split("(")
             .map(|s| s.to_string())
             .collect();
+        let func_name: String = new_lines[0].replace(" ", "").replace("　", "").clone();
 
-        let func_name: String = new_lines[0].clone();
+        if self.log {
+            println!("引数の値を求めます");
+        }
 
         let func_args: Vec<f64> = new_lines[1]
             .split(',')
@@ -657,13 +658,15 @@ impl<'a> Executor<'a> {
             .replace("　", "")
             .replace("(", "")
             .replace(")", "");
+
+        if self.log {
+            println!("関数{name}を呼び出します");
+        }
+
         let code = match self.get_function(name.clone()) {
             Some(func) => func.code,
             None => return 0.0,
         };
-        if self.log {
-            println!("関数{name}を呼び出します");
-        }
 
         let mut pre = String::new();
 
@@ -671,9 +674,10 @@ impl<'a> Executor<'a> {
             pre += format!("var {i} = {j}\n").as_str();
         }
 
-        let mut instance = Executor::new(&mut self.memory, &mut self.name_space, self.log);
-
+        let mut instance = Executor::new(&mut self.memory, &mut self.name_space, false);
         instance.execute_block(&pre);
+
+        instance.log = true;
         match instance.execute_block(&code) {
             Some(indes) => indes,
             None => 0.0,
@@ -840,6 +844,11 @@ impl<'a> Executor<'a> {
             if self.log {
                 println!("| Stack: {:?}  ←  '{}'", stack, item);
             }
+
+            if item.contains("(") {
+                stack.push(self.call_function(item.to_string()));
+                continue;
+            }
             match item.parse::<f64>() {
                 Ok(number) => {
                     stack.push(number);
@@ -868,11 +877,7 @@ impl<'a> Executor<'a> {
                             stack.push(x);
                             stack.push(y);
 
-                            if item.contains("(") || item.contains(")") {
-                                stack.push(self.call_function(item.to_string()));
-                            } else {
-                                stack.push(self.get_variable_value(item.to_string()));
-                            }
+                            stack.push(self.get_variable_value(item.to_string()));
                         }
                     }
                 }
