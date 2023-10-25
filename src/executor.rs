@@ -709,10 +709,20 @@ impl<'a> Executor<'a> {
         instance.execute_block(&pre);
 
         instance.log = true;
-        match instance.execute_block(&code) {
+        let result = match instance.execute_block(&code) {
             Some(indes) => indes,
             None => 0.0,
+        };
+
+        let mut aft = String::new();
+
+        for i in self.args.iter() {
+            aft += format!("del{i}\n").as_str();
         }
+        instance.log = false;
+        instance.execute_block(&aft);
+
+        result
     }
 
     /// 関数を定義する
