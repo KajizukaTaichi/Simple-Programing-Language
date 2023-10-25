@@ -383,7 +383,38 @@ impl<'a> Executor<'a> {
                     if self.log {
                         println!("標準出力に表示します");
                     }
-                    for i in params.split(",").collect::<Vec<&str>>() {
+                    let elements: Vec<String> = {
+                        let mut elements = Vec::new();
+                        let mut buffer = String::new();
+                        let mut stack = 0;
+
+                        for c in params.chars() {
+                            match c {
+                                '(' => {
+                                    stack += 1;
+                                    buffer.push('(');
+                                }
+                                ')' => {
+                                    stack -= 1;
+                                    buffer.push(')');
+                                }
+                                ',' if stack == 0 => {
+                                    elements.push(buffer.clone());
+                                    buffer.clear();
+                                }
+                                _ => {
+                                    buffer.push(c);
+                                }
+                            }
+                        }
+
+                        if !buffer.is_empty() {
+                            elements.push(buffer);
+                        }
+
+                        elements
+                    };
+                    for i in elements {
                         if i.contains("'") || i.contains("\"") {
                             //文字列か？
                             text += &i.replace("'", "").replace("\"", "");
@@ -831,8 +862,38 @@ impl<'a> Executor<'a> {
 
     /// 式の計算
     fn compute(&mut self, expr: String) -> f64 {
+        let tokens: Vec<String> = {
+            let mut elements = Vec::new();
+            let mut buffer = String::new();
+            let mut stack = 0;
+
+            for c in expr.chars() {
+                match c {
+                    '(' => {
+                        stack += 1;
+                        buffer.push('(');
+                    }
+                    ')' => {
+                        stack -= 1;
+                        buffer.push(')');
+                    }
+                    ' ' | '　' if stack == 0 => {
+                        elements.push(buffer.clone());
+                        buffer.clear();
+                    }
+                    _ => {
+                        buffer.push(c);
+                    }
+                }
+            }
+
+            if !buffer.is_empty() {
+                elements.push(buffer);
+            }
+
+            elements
+        };
         let mut stack: Vec<f64> = Vec::new();
-        let tokens = expr.split_whitespace();
         if self.log {
             println!("+-- 式を計算します");
         }
