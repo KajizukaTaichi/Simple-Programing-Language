@@ -430,6 +430,15 @@ impl<'a> Executor<'a> {
                     } else {
                         println!("{text}");
                     }
+                } else if lines.contains("ref") {
+                    if self.log {
+                        println!("変数の参照を取得します")
+                    }
+                    let name = lines.replacen("ref", "", 1);
+                    let address = self.reference_variable(name.clone());
+                    if let Some(i) = address {
+                        println!("変数{}のアドレスは{}です", name, i)
+                    }
                 } else if lines.contains("mem") {
                     let mut name_max_len = 0;
                     for i in self.memory.iter() {
@@ -449,8 +458,12 @@ impl<'a> Executor<'a> {
                         if self.log {
                             println!("+-- メモリ内の変数");
                         }
-                        for i in self.memory.iter() {
-                            println!("| {:<name_max_len$} : {:>value_max_len$} ", i.name, i.value)
+                        for i in 0..self.memory.len() {
+                            let vars = &self.memory[i];
+                            println!(
+                                "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
+                                i, vars.name, vars.value
+                            )
                         }
                     } else {
                         if self.log {
@@ -724,8 +737,12 @@ impl<'a> Executor<'a> {
 
         let mut pre = String::new();
 
+        for i in function_args.iter() {
+            pre += format!("var {i}\n").as_str(); // 引数は変数として扱われる
+        }
+
         for (i, j) in function_args.iter().zip(args_value.iter()) {
-            pre += format!("var {i} = {j}\n").as_str();
+            pre += format!("var {i} = {j}\n").as_str(); // 引数は変数として扱われる
         }
 
         let mut instance = Executor::new(&mut self.memory, &mut self.name_space, false);
@@ -879,7 +896,7 @@ impl<'a> Executor<'a> {
     /// 変数の値を取得する
     fn get_variable_value(&mut self, name: String) -> f64 {
         if self.log {
-            println!("変数{name}を参照します");
+            println!("変数{name}を読み込みます");
         }
         match self.get_variable(name) {
             Some(i) => i.value,
@@ -969,6 +986,18 @@ impl<'a> Executor<'a> {
                         "!" => {
                             stack.push(x);
                             stack.push(if y == 0.0 { 1.0 } else { 0.0 })
+                        }
+                        "~" => {
+                            stack.push(x);
+                            stack.push({
+                                println!("ポインタがさす値を求めます");
+                                if y.round() as usize > &self.memory.len() - 1 {
+                                    println!("エラー!アドレスが不正です");
+                                    0.0
+                                } else {
+                                    self.memory[y.round() as usize].value
+                                }
+                            })
                         }
                         _ => {
                             stack.push(x);
