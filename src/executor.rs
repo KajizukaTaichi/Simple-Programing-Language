@@ -50,7 +50,6 @@ pub struct Executor<'a> {
     else_stmt: String,                 // elseステートメント
     count: usize,                      // ループカウンタ
     data: String,                      // 関数のデータ
-    args: Vec<String>,                 //　引数
     expr: String,                      // 条件式
     log: bool,                         // ログ出力
     mode: Mode,                        // 制御ブロックの状態
@@ -75,7 +74,6 @@ impl<'a> Executor<'a> {
             else_stmt: "".to_string(),
             count: 0,
             data: "".to_string(),
-            args: Vec::new(),
             expr: "".to_string(),
             log,
             mode: Mode::Normal,
@@ -328,6 +326,10 @@ impl<'a> Executor<'a> {
                     );
                 } else if lines.contains("func") {
                     //　関数の定義
+                    if !lines.contains("(") {
+                        println!("エラー! 関数にはカッコをつけてください");
+                        return None;
+                    }
                     self.data = lines.to_string();
                     let name: &String = &lines
                         .trim()
@@ -429,15 +431,26 @@ impl<'a> Executor<'a> {
                         println!("{text}");
                     }
                 } else if lines.contains("mem") {
+                    let mut name_max_len = 0;
+                    for i in self.memory.iter() {
+                        if name_max_len < i.name.len() {
+                            name_max_len = i.name.len()
+                        }
+                    }
+
+                    let mut value_max_len = 0;
+                    for i in self.memory.iter() {
+                        if value_max_len < i.value.to_string().len() {
+                            value_max_len = i.value.to_string().len()
+                        }
+                    }
+
                     if !self.memory.is_empty() {
                         if self.log {
-                            println!("+-- メモリ内の変数 --");
+                            println!("+-- メモリ内の変数");
                         }
                         for i in self.memory.iter() {
-                            println!(
-                                "|- address: {:p} - name: '{}' -  value: {} -",
-                                i, i.name, i.value
-                            )
+                            println!("| {:<name_max_len$} : {:>value_max_len$} ", i.name, i.value)
                         }
                     } else {
                         if self.log {
@@ -446,23 +459,27 @@ impl<'a> Executor<'a> {
                     }
                     if !self.name_space.is_empty() {
                         if self.log {
-                            println!("+-- メモリ内の関数 --");
+                            println!("+-- メモリ内の関数");
                         }
                         for i in self.name_space.iter() {
                             if self.log {
-                                println!(
-                                    "|+--  address: {:p} - name: '{}' - len: {} -",
-                                    i,
-                                    i.name,
-                                    i.code.len()
-                                );
+                                println!("| +--  {} ({}) ", i.name, i.args.join(", "));
                             }
                             let mut number = 0; //行数
                             for j in i.code.split('\n') {
                                 if j != "" {
                                     number += 1;
                                     if self.log {
-                                        println!("|| [{number}]: {j}");
+                                        println!(
+                                            "| | {number:>len$}: {j}",
+                                            len = i
+                                                .code
+                                                .split('\n')
+                                                .collect::<Vec<_>>()
+                                                .len()
+                                                .to_string()
+                                                .len()
+                                        );
                                     }
                                 }
                             }
@@ -476,23 +493,23 @@ impl<'a> Executor<'a> {
                     // 変数や関数の削除
                     let new_lines = lines.replacen("del", "", 1);
                     let name = &new_lines;
-                    match self.reference_variable(name.clone()) {
-                        Some(index) => {
-                            self.memory.remove(index);
-                            if self.log {
-                                println!("変数{}を削除しました", name);
-                            }
-                        }
-                        None => {}
-                    }
-                    match self.reference_function(name.to_owned()) {
-                        Some(index) => {
+                    if name.contains("(") {
+                        if let Some(index) = self.reference_function(name.to_owned()) {
                             self.name_space.remove(index);
                             if self.log {
                                 println!("関数{}を削除しました", name);
                             }
                         }
-                        None => {}
+                    } else {
+                        match self.reference_variable(name.clone()) {
+                            Some(index) => {
+                                self.memory.remove(index);
+                                if self.log {
+                                    println!("変数{}を削除しました", name);
+                                }
+                            }
+                            None => {}
+                        }
                     }
                 } else if lines.contains("rand") {
                     // 乱数
@@ -611,7 +628,7 @@ impl<'a> Executor<'a> {
                 } else if menu.contains("mem") {
                     if self.memory.is_empty() {
                         if self.log {
-                            println!("+-- メモリ内の変数 --");
+                            println!("+-- メモリ内の変数");
                         }
                         for i in self.memory.iter() {
                             println!("| name: '{}'  - value: {}", i.name, i.value)
@@ -623,7 +640,7 @@ impl<'a> Executor<'a> {
                     }
                     if self.name_space.is_empty() {
                         if self.log {
-                            println!("+-- メモリ内の関数 --");
+                            println!("+-- メモリ内の関数");
                         }
                         for i in self.name_space.iter() {
                             if self.log {
@@ -666,6 +683,10 @@ impl<'a> Executor<'a> {
 
     ///　関数を呼び出す
     fn call_function(&mut self, item: String) -> f64 {
+        if !item.contains("(") {
+            println!("エラー! 関数にはカッコをつけてください");
+            return 0.0;
+        }
         let new_lines: Vec<String> = item
             .trim()
             .replacen("call", "", 1)
@@ -679,7 +700,7 @@ impl<'a> Executor<'a> {
             println!("引数の値を求めます");
         }
 
-        let func_args: Vec<f64> = new_lines[1]
+        let args_value: Vec<f64> = new_lines[1]
             .split(',')
             .map(|s| self.compute(s.to_string()))
             .collect();
@@ -699,9 +720,11 @@ impl<'a> Executor<'a> {
             None => return 0.0,
         };
 
+        let function_args = self.get_function(name.clone()).unwrap().args.clone();
+
         let mut pre = String::new();
 
-        for (i, j) in self.args.iter().zip(func_args.iter()) {
+        for (i, j) in function_args.iter().zip(args_value.iter()) {
             pre += format!("var {i} = {j}\n").as_str();
         }
 
@@ -716,8 +739,8 @@ impl<'a> Executor<'a> {
 
         let mut aft = String::new();
 
-        for i in self.args.iter() {
-            aft += format!("del{i}\n").as_str();
+        for i in function_args.iter() {
+            aft += format!("del {i}\n").as_str();
         }
         instance.log = false;
         instance.execute_block(&aft);
@@ -739,9 +762,7 @@ impl<'a> Executor<'a> {
 
         let func_name: String = new_lines[0].clone();
 
-        let func_args: Vec<String> = new_lines[1].split(',').map(|s| s.to_string()).collect();
-
-        self.args = func_args.clone();
+        let args_value: Vec<String> = new_lines[1].split(',').map(|s| s.to_string()).collect();
 
         let name = func_name
             .replace(" ", "")
@@ -765,7 +786,7 @@ impl<'a> Executor<'a> {
             //　関数が在る場合は更新する
             let address = self.reference_function(func_name.clone()).unwrap_or(0);
             self.name_space[address].code = code.clone();
-            self.name_space[address].args = func_args.clone();
+            self.name_space[address].args = args_value.clone();
             if self.log {
                 println!("関数{name}のデータを更新しました");
             }
@@ -773,7 +794,7 @@ impl<'a> Executor<'a> {
             //ない場合は新規に確保する
             self.name_space.push(Function {
                 name: name.clone(),
-                args: func_args,
+                args: args_value,
                 code: code,
             });
             if self.log {
@@ -784,7 +805,12 @@ impl<'a> Executor<'a> {
 
     /// 関数の参照
     fn reference_function(&mut self, name: String) -> Option<usize> {
-        let name = name.trim().replace(" ", "").replace("　", "");
+        let name = name
+            .trim()
+            .replace(" ", "")
+            .replace("　", "")
+            .replace("(", "")
+            .replace(")", "");
         match self
             .name_space
             .iter()
