@@ -434,10 +434,23 @@ impl<'a> Executor<'a> {
                     if self.log {
                         println!("変数の参照を取得します")
                     }
-                    let name = lines.replacen("ref", "", 1);
-                    let address = self.reference_variable(name.clone());
-                    if let Some(i) = address {
-                        println!("変数{}のアドレスは{}です", name, i)
+                    let lines = lines.replacen("ref", "", 1);
+                    if lines.contains("=") {
+                        let params: Vec<&str> = lines.split("=").collect();
+                        let address = self.reference_variable(params[1..].join("=").to_string());
+                        if let Some(i) = address {
+                            if self.log {
+                                println!("変数{}のアドレスは{}です", params[0], i);
+                            }
+                            self.set_variable(params[0].to_string(), i.to_string());
+                        }
+                    } else {
+                        let address = self.reference_variable(lines.clone());
+                        if let Some(i) = address {
+                            if self.log {
+                                println!("変数{}のアドレスは{}です", lines, i);
+                            }
+                        }
                     }
                 } else if lines.contains("mem") {
                     let mut name_max_len = 0;
@@ -748,7 +761,7 @@ impl<'a> Executor<'a> {
         let mut instance = Executor::new(&mut self.memory, &mut self.name_space, false);
         instance.execute_block(&pre);
 
-        instance.log = true;
+        instance.log = self.log;
         let result = match instance.execute_block(&code) {
             Some(indes) => indes,
             None => 0.0,
@@ -990,7 +1003,9 @@ impl<'a> Executor<'a> {
                         "~" => {
                             stack.push(x);
                             stack.push({
-                                println!("ポインタがさす値を求めます");
+                                if self.log {
+                                    println!("ポインタがさす値を求めます");
+                                }
                                 if y.round() as usize > &self.memory.len() - 1 {
                                     println!("エラー!アドレスが不正です");
                                     0.0
