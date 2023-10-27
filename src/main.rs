@@ -19,7 +19,7 @@ fn main() {
     let args = env::args().collect::<Vec<_>>();
     let mut memory = Vec::new();
     let mut name_space = Vec::new();
-    let mut executor = executor::Executor::new(&mut memory, &mut name_space, true);
+    let mut executor = executor::Executor::new(&mut memory, &mut name_space, false, true);
     if args.len() >= 3 {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
@@ -29,7 +29,7 @@ fn main() {
                     executor.script(&code);
                 } else if args[1] == "debug" || args[1] == "d" {
                     println!("{}をデバッグします", args[2]);
-                    executor.debug(&code);
+                    executor.debugger(&code);
                 } else if args[1] == "interactive" || args[1] == "i" {
                     println!("{message}");
                     executor.interactive();
