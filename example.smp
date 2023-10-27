@@ -1,7 +1,11 @@
-var true = 1.0
+var true = 1.0　# 論理値を設定する
 var false = 0.0
 
-func prime()
+# 素数かどうか判定する
+# 引数はポインタ
+# 戻り値は論理型
+func prime(ptr)
+    var number = ptr ~
     if number 2 <
         return false
     end if
@@ -32,18 +36,20 @@ end func
 print'素数判定プログラム'
 print'Build on Simple programing language'
 
+# 無限に入力を受け付ける
 while true
     input number
 
-    if number false =
+    if number false =　
         print'終了します'
-        break
+        break # 入力が間違えていたら終了
     end if
 
-    if prime() true =
+    ref ptr = number # numberの参照
+    
+    if prime(ptr) true =
         print number,'は素数です'
     else
         print number,'は素数ではありません'
     end if
 end while
- 
