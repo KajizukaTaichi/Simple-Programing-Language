@@ -23,7 +23,7 @@ pub struct Variable {
 pub struct Function {
     name: String,
     args: Vec<String>,
-    code: String,
+    code: Vec<String>,
 }
 
 /// 制御モード
@@ -49,8 +49,8 @@ pub enum ExecutionMode {
 pub struct Executor<'a> {
     memory: &'a mut Vec<Variable>,     //　メモリ内の変数
     name_space: &'a mut Vec<Function>, // 関数の名前空間
-    stmt: String,                      // ブロックのステートメント
-    else_stmt: String,                 // elseステートメント
+    stmt: Vec<String>,                 // ブロックのステートメント
+    else_stmt: Vec<String>,            // elseステートメント
     count: usize,                      // ループカウンタ
     data: String,                      // 関数のデータ
     expr: String,                      // 条件式
@@ -72,8 +72,8 @@ impl<'a> Executor<'a> {
         Executor {
             memory: memory,
             name_space: name_space,
-            stmt: "".to_string(),
-            else_stmt: "".to_string(),
+            stmt: Vec::new(),
+            else_stmt: Vec::new(),
             count: 0,
             data: "".to_string(),
             expr: "".to_string(),
@@ -98,12 +98,8 @@ impl<'a> Executor<'a> {
                     // ネストの階層を判別する
                     if self.nest_for > 0 {
                         self.nest_for -= 1;
-                        self.stmt += lines;
-                        self.stmt += "\n";
+                        self.stmt.push(lines.to_string());
                     } else {
-                        if let Some(index) = self.stmt.rfind('\n') {
-                            self.stmt.truncate(index);
-                        }
                         for i in 0..self.count {
                             if let ExecutionMode::Script = self.execution_mode {
                             } else {
@@ -114,7 +110,7 @@ impl<'a> Executor<'a> {
                                 &mut self.name_space,
                                 self.execution_mode.clone(),
                             )
-                            .execute_block(&mut self.stmt);
+                            .execute_block(self.stmt.clone());
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -128,35 +124,28 @@ impl<'a> Executor<'a> {
                                 None => {}
                             }
                         } // モードを元に戻す
-                        self.stmt = String::new();
+                        self.stmt = Vec::new();
                         self.control_mode = ControlMode::Normal;
                     }
                 } else if lines.contains("for") {
                     // ネストの階層を上げる
                     self.nest_for += 1;
-                    self.stmt += lines;
-                    self.stmt += "\n";
+                    self.stmt.push(lines.to_string());
                 } else {
                     // コードを追加する
-                    self.stmt += lines;
-                    self.stmt += "\n";
+                    self.stmt.push(lines.to_string());
                 }
             }
 
             ControlMode::If => {
                 if lines.contains("else") {
                     // モードをelseに変える
-
                     self.control_mode = ControlMode::Else
                 } else if lines.contains("end if") {
                     if self.nest_if > 0 {
                         self.nest_if -= 1;
-                        self.stmt += lines;
-                        self.stmt += "\n";
+                        self.stmt.push(lines.to_string());
                     } else {
-                        if let Some(index) = self.stmt.rfind('\n') {
-                            self.stmt.truncate(index);
-                        } // 条件式を評価する
                         if let ExecutionMode::Script = self.execution_mode {
                         } else {
                             println!("ifの条件式を評価します");
@@ -171,7 +160,7 @@ impl<'a> Executor<'a> {
                                 &mut self.name_space,
                                 self.execution_mode.clone(),
                             )
-                            .execute_block(&mut self.stmt);
+                            .execute_block(self.stmt.clone());
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -184,23 +173,21 @@ impl<'a> Executor<'a> {
                                 }
                                 None => {}
                             }
-                            self.stmt = String::new();
+                            self.stmt = Vec::new();
                         } else {
                             if let ExecutionMode::Script = self.execution_mode {
                             } else {
                                 println!("条件が一致しなかったので、実行しません");
                             }
-                            self.stmt = String::new();
+                            self.stmt = Vec::new();
                         }
                         self.control_mode = ControlMode::Normal;
                     }
                 } else if lines.contains("if") {
                     self.nest_if += 1;
-                    self.stmt += lines;
-                    self.stmt += "\n";
+                    self.stmt.push(lines.to_string());
                 } else {
-                    self.stmt += lines;
-                    self.stmt += "\n";
+                    self.stmt.push(lines.to_string());
                 }
             }
 
@@ -208,12 +195,8 @@ impl<'a> Executor<'a> {
                 if lines.contains("end if") {
                     if self.nest_if > 0 {
                         self.nest_if -= 1;
-                        self.stmt += lines;
-                        self.stmt += "\n";
+                        self.else_stmt.push(lines.to_string());
                     } else {
-                        if let Some(index) = self.else_stmt.rfind('\n') {
-                            self.else_stmt.truncate(index);
-                        }
                         if let ExecutionMode::Script = self.execution_mode {
                         } else {
                             println!("ifの条件式を評価します");
@@ -228,7 +211,7 @@ impl<'a> Executor<'a> {
                                 &mut self.name_space,
                                 self.execution_mode.clone(),
                             )
-                            .execute_block(&mut self.else_stmt);
+                            .execute_block(self.else_stmt.clone());
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -239,8 +222,8 @@ impl<'a> Executor<'a> {
                                 }
                                 None => {}
                             }
-                            self.else_stmt = String::new();
-                            self.stmt = String::new();
+                            self.else_stmt = Vec::new();
+                            self.stmt = Vec::new();
                         } else {
                             if let ExecutionMode::Script = self.execution_mode {
                             } else {
@@ -251,7 +234,7 @@ impl<'a> Executor<'a> {
                                 &mut self.name_space,
                                 self.execution_mode.clone(),
                             )
-                            .execute_block(&mut self.stmt);
+                            .execute_block(self.stmt.clone());
                             match status {
                                 Some(i) => {
                                     if i == f64::MAX {
@@ -262,38 +245,33 @@ impl<'a> Executor<'a> {
                                 }
                                 None => {}
                             }
-                            self.else_stmt = String::new();
-                            self.stmt = String::new();
+                            self.else_stmt = Vec::new();
+                            self.stmt = Vec::new();
                         }
                         self.control_mode = ControlMode::Normal;
                     }
                 } else if lines.contains("if") {
                     self.nest_if += 1;
-                    self.stmt += lines;
-                    self.stmt += "\n";
+                    self.stmt.push(lines.to_string());
+
                     self.control_mode = ControlMode::If;
                 } else {
-                    self.else_stmt += lines;
-                    self.else_stmt += &String::from("\n");
+                    self.else_stmt.push(lines.to_string());
                 }
             }
             ControlMode::While => {
                 if lines.contains("end while") {
                     if self.nest_while > 0 {
                         self.nest_while -= 1;
-                        self.stmt += lines;
-                        self.stmt += "\n";
+                        self.stmt.push(lines.to_string());
                     } else {
-                        if let Some(index) = self.stmt.rfind('\n') {
-                            self.stmt.truncate(index);
-                        }
                         loop {
                             if let ExecutionMode::Script = self.execution_mode {
                             } else {
                                 println!("whileの条件式を評価します");
                             }
                             if self.compute(self.expr.trim().to_string()) == 0.0 {
-                                self.stmt = String::new();
+                                self.stmt = Vec::new();
                                 if let ExecutionMode::Script = self.execution_mode {
                                 } else {
                                     println!("条件が一致しなかったので、ループを脱出します");
@@ -309,7 +287,7 @@ impl<'a> Executor<'a> {
                                     &mut self.name_space,
                                     self.execution_mode.clone(),
                                 )
-                                .execute_block(&mut self.stmt);
+                                .execute_block(self.stmt.clone());
                                 match status {
                                     Some(i) => {
                                         if i == f64::MAX {
@@ -328,8 +306,7 @@ impl<'a> Executor<'a> {
                 } else if lines.contains("while") {
                     self.nest_while += 1;
                 } else {
-                    self.stmt += lines;
-                    self.stmt += "\n";
+                    self.stmt.push(lines.to_string());
                 }
             }
 
@@ -337,21 +314,16 @@ impl<'a> Executor<'a> {
                 if lines.contains("end func") {
                     if self.nest_func > 0 {
                         self.nest_func -= 1;
-                        self.stmt += lines;
-                        self.stmt += "\n";
+                        self.stmt.push(lines.to_string());
                     } else {
-                        if let Some(index) = self.stmt.rfind('\n') {
-                            self.stmt.truncate(index);
-                        }
                         self.set_function(self.data.clone(), self.stmt.clone());
-                        self.stmt = String::new();
+                        self.stmt = Vec::new();
                         self.control_mode = ControlMode::Normal;
                     }
                 } else if lines.contains("func") {
                     self.nest_func += 1;
                 } else {
-                    self.stmt += lines;
-                    self.stmt += "\n";
+                    self.stmt.push(lines.to_string());
                 }
             }
 
@@ -553,20 +525,14 @@ impl<'a> Executor<'a> {
                                 println!("| +--  {} ({}) ", i.name, i.args.join(", "));
                             }
                             let mut number = 0; //行数
-                            for j in i.code.split('\n') {
+                            for j in i.code.iter() {
                                 if j != "" {
                                     number += 1;
                                     if let ExecutionMode::Script = self.execution_mode {
                                     } else {
                                         println!(
                                             "| | {number:>len$}: {j}",
-                                            len = i
-                                                .code
-                                                .split('\n')
-                                                .collect::<Vec<_>>()
-                                                .len()
-                                                .to_string()
-                                                .len()
+                                            len = i.code.len().to_string().len()
                                         );
                                     }
                                 }
@@ -675,9 +641,9 @@ impl<'a> Executor<'a> {
     }
 
     /// ブロックを実行
-    pub fn execute_block(&mut self, code: &String) -> Option<f64> {
+    pub fn execute_block(&mut self, code: Vec<String>) -> Option<f64> {
         let mut number = 0;
-        for lin in code.split("\n") {
+        for lin in code.iter() {
             if let ControlMode::Normal = self.control_mode {
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
@@ -716,9 +682,9 @@ impl<'a> Executor<'a> {
     }
 
     /// スクリプトを実行する
-    pub fn script(&mut self, code: &String) {
+    pub fn script(&mut self, code: &String) -> Option<f64>{
         self.execution_mode = ExecutionMode::Script;
-        self.execute_block(code);
+        return self.execute_block(code.split("\n").map(|x| x.to_string()).collect());
     }
 
     /// ファイルをデバッグする
@@ -845,20 +811,14 @@ impl<'a> Executor<'a> {
                             println!("| +--  {} ({}) ", i.name, i.args.join(", "));
                         }
                         let mut number = 0; //行数
-                        for j in i.code.split('\n') {
+                        for j in i.code.iter() {
                             if j != "" {
                                 number += 1;
                                 if let ExecutionMode::Script = self.execution_mode {
                                 } else {
                                     println!(
                                         "| | {number:>len$}: {j}",
-                                        len = i
-                                            .code
-                                            .split('\n')
-                                            .collect::<Vec<_>>()
-                                            .len()
-                                            .to_string()
-                                            .len()
+                                        len = i.code.len().to_string().len()
                                     );
                                 }
                             }
@@ -942,14 +902,14 @@ impl<'a> Executor<'a> {
 
         let function_args = self.get_function(name.clone()).unwrap().args.clone();
 
-        let mut pre = String::new();
+        let mut pre = Vec::new();
 
         for i in function_args.iter() {
-            pre += format!("var {i}\n").as_str(); // 引数は変数として扱われる
+            pre.push(format!("var {i}")); // 引数は変数として扱われる
         }
 
         for (i, j) in function_args.iter().zip(args_value.iter()) {
-            pre += format!("var {i} = {j}\n").as_str(); // 引数は変数として扱われる
+            pre.push(format!("var {i} = {j}")); // 引数は変数として扱われる
         }
 
         let mut instance = Executor::new(
@@ -957,17 +917,17 @@ impl<'a> Executor<'a> {
             &mut self.name_space,
             self.execution_mode.clone(),
         );
-        instance.execute_block(&pre);
+        instance.execute_block(pre);
 
         instance.execution_mode = self.execution_mode.clone();
-        match instance.execute_block(&code) {
+        match instance.execute_block(code) {
             Some(indes) => indes,
             None => 0.0,
         }
     }
 
     /// 関数を定義する
-    fn set_function(&mut self, item: String, code: String) {
+    fn set_function(&mut self, item: String, code: Vec<String>) {
         let new_lines: Vec<String> = item
             .trim()
             .replacen("func", "", 1)
