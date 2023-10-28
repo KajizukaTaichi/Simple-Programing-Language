@@ -329,6 +329,10 @@ impl<'a> Executor<'a> {
             }
 
             Mode::Normal => {
+                if self.debug {
+                    println!("〔 {lines} 〕を実行します");
+                }
+
                 if lines.contains("var") {
                     // 変数の定義
                     let new_lines = lines.replacen("var", "", 1);
@@ -661,10 +665,15 @@ impl<'a> Executor<'a> {
     pub fn debugger(&mut self, code: &String) {
         self.log = true;
         self.debug = true;
+        let mut number = 0; // 行番号
         for lin in code.split("\n") {
             let lin = lin.trim().split("#").collect::<Vec<&str>>()[0];
             if lin == "" {
                 continue;
+            }
+            if let Mode::Normal = self.mode {
+                number = number + 1;
+                print!("{number}行目の");
             }
 
             self.execute(lin.to_string());
@@ -728,68 +737,67 @@ impl<'a> Executor<'a> {
                     }
                 }
             } else if menu.contains("mem") {
-                if self.memory.is_empty() {
-                    let mut name_max_len = 0;
-                    for i in self.memory.iter() {
-                        if name_max_len < i.name.len() {
-                            name_max_len = i.name.len()
-                        }
+                let mut name_max_len = 0;
+                for i in self.memory.iter() {
+                    if name_max_len < i.name.len() {
+                        name_max_len = i.name.len()
                     }
+                }
 
-                    let mut value_max_len = 0;
-                    for i in self.memory.iter() {
-                        if value_max_len < i.value.to_string().len() {
-                            value_max_len = i.value.to_string().len()
-                        }
+                let mut value_max_len = 0;
+                for i in self.memory.iter() {
+                    if value_max_len < i.value.to_string().len() {
+                        value_max_len = i.value.to_string().len()
                     }
+                }
 
-                    if !self.memory.is_empty() {
-                        if self.log {
-                            println!("+-- メモリ内の変数");
-                        }
-                        for i in 0..self.memory.len() {
-                            let vars = &self.memory[i];
-                            println!(
-                                "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
-                                i, vars.name, vars.value
-                            )
-                        }
-                    } else {
-                        if self.log {
-                            println!("変数がありません");
-                        }
+                if !self.memory.is_empty() {
+                    if self.log {
+                        println!("+-- メモリ内の変数");
                     }
-                    if !self.name_space.is_empty() {
+                    for i in 0..self.memory.len() {
+                        let vars = &self.memory[i];
+                        println!(
+                            "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
+                            i, vars.name, vars.value
+                        )
+                    }
+                } else {
+                    if self.log {
+                        println!("変数がありません");
+                    }
+                }
+
+                if !self.name_space.is_empty() {
+                    if self.log {
+                        println!("+-- メモリ内の関数");
+                    }
+                    for i in self.name_space.iter() {
                         if self.log {
-                            println!("+-- メモリ内の関数");
+                            println!("| +--  {} ({}) ", i.name, i.args.join(", "));
                         }
-                        for i in self.name_space.iter() {
-                            if self.log {
-                                println!("| +--  {} ({}) ", i.name, i.args.join(", "));
-                            }
-                            let mut number = 0; //行数
-                            for j in i.code.split('\n') {
-                                if j != "" {
-                                    number += 1;
-                                    if self.log {
-                                        println!(
-                                            "| | {number:>len$}: {j}",
-                                            len = i
-                                                .code
-                                                .split('\n')
-                                                .collect::<Vec<_>>()
-                                                .len()
-                                                .to_string()
-                                                .len()
-                                        );
-                                    }
+                        let mut number = 0; //行数
+                        for j in i.code.split('\n') {
+                            if j != "" {
+                                number += 1;
+                                if self.log {
+                                    println!(
+                                        "| | {number:>len$}: {j}",
+                                        len = i
+                                            .code
+                                            .split('\n')
+                                            .collect::<Vec<_>>()
+                                            .len()
+                                            .to_string()
+                                            .len()
+                                    );
                                 }
                             }
                         }
-                    } else {
-                        if self.log {
-                            println!("関数がありません");
-                        }
+                    }
+                } else {
+                    if self.log {
+                        println!("関数がありません");
                     }
                 }
             } else if menu.contains("exit") {
