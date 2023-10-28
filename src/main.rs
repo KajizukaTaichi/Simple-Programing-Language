@@ -19,7 +19,11 @@ fn main() {
     let args = env::args().collect::<Vec<_>>();
     let mut memory = Vec::new();
     let mut name_space = Vec::new();
-    let mut executor = executor::Executor::new(&mut memory, &mut name_space, false, true);
+    let mut executor = executor::Executor::new(
+        &mut memory,
+        &mut name_space,
+        executor::ExecutionMode::Script,
+    );
     if args.len() >= 3 {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
