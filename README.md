@@ -4,18 +4,14 @@ Simpleは子ども達が楽しくプログラミングしながらコンピュ�
 
 このSimpleの教育用プログラミング言語として普及を目指しています。
 
-
-![image](https://github.com/KajizukaTaichi/Simple-Programing-Language/assets/122075081/ef08d02d-8b8a-43d6-9e9f-6ab1629753f7)
-
+![image](https://github.com/KajizukaTaichi/Simple-Programing-Language/assets/122075081/46c4c359-a7bf-4704-a07b-a762360e7a0f)
 
 ☝対話的にプログラミングしている画像
 
+- 詳しい解説は[ドキュメント](https://github.com/KajizukaTaichi/Simple-Programing-Language/wiki/%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88)をご覧ください。
 ## ライセンス
 このSimpleプログラミング言語はMITライセンスの下で提供されています。詳細については、[LICENSE](LICENSE)ファイルを参照してください。
 
 
  
 このプログラムはMITライセンスのもと、自由でオープンソースとして提供されており、誰もが利用、変更、および共有することができます。我々は子ども達の学びを支援し、プログラミング教育に貢献することを目指しています。
-
-
-- 詳しい解説は[ドキュメント](https://github.com/KajizukaTaichi/Simple-Programing-Language/wiki/%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88)をご覧ください。
