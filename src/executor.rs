@@ -13,7 +13,7 @@ fn input(prompt: &str) -> String {
 
 #[derive(Clone)]
 pub enum Type {
-    Integer(f64),
+    Number(f64),
     String(String),
 }
 
@@ -127,7 +127,7 @@ impl<'a> Executor<'a> {
                             .execute_block(self.stmt.clone());
                             match status {
                                 Some(j) => {
-                                    if let Type::Integer(k) = j {
+                                    if let Type::Number(k) = j {
                                         if k == f64::MAX {
                                             //状態が1(break)の時はループを抜け出す
                                             break;
@@ -168,7 +168,7 @@ impl<'a> Executor<'a> {
                         } else {
                             println!("ifの条件式を評価します");
                         }
-                        if let Type::Integer(i) = self.compute(self.expr.clone()) {
+                        if let Type::Number(i) = self.compute(self.expr.clone()) {
                             if i == 0.0 {
                                 if let ExecutionMode::Script = self.execution_mode {
                                 } else {
@@ -191,10 +191,10 @@ impl<'a> Executor<'a> {
                                 .execute_block(self.stmt.clone());
                                 match status {
                                     Some(j) => {
-                                        if let Type::Integer(k) = j {
+                                        if let Type::Number(k) = j {
                                             if k == f64::MAX {
                                                 //状態が1(break)の時はループを抜け出す
-                                                return Some(Type::Integer(f64::MAX));
+                                                return Some(Type::Number(f64::MAX));
                                             } else {
                                                 return Some(j);
                                             }
@@ -228,7 +228,7 @@ impl<'a> Executor<'a> {
                         } else {
                             println!("ifの条件式を評価します");
                         }
-                        if let Type::Integer(i) = self.compute(self.expr.clone()) {
+                        if let Type::Number(i) = self.compute(self.expr.clone()) {
                             if i == 0.0 {
                                 if let ExecutionMode::Script = self.execution_mode {
                                 } else {
@@ -245,10 +245,10 @@ impl<'a> Executor<'a> {
                                 .execute_block(self.else_stmt.clone());
                                 match status {
                                     Some(j) => {
-                                        if let Type::Integer(k) = j {
+                                        if let Type::Number(k) = j {
                                             if k == f64::MAX {
                                                 //状態が1(break)の時はループを抜け出す
-                                                return Some(Type::Integer(f64::MAX));
+                                                return Some(Type::Number(f64::MAX));
                                             } else {
                                                 return Some(j);
                                             }
@@ -277,10 +277,10 @@ impl<'a> Executor<'a> {
                                 .execute_block(self.stmt.clone());
                                 match status {
                                     Some(j) => {
-                                        if let Type::Integer(k) = j {
+                                        if let Type::Number(k) = j {
                                             if k == f64::MAX {
                                                 //状態が1(break)の時はループを抜け出す
-                                                return Some(Type::Integer(f64::MAX));
+                                                return Some(Type::Number(f64::MAX));
                                             }
                                         } else {
                                             // 戻り値を返す
@@ -315,7 +315,7 @@ impl<'a> Executor<'a> {
                             } else {
                                 println!("whileの条件式を評価します");
                             }
-                            if let Type::Integer(i) = self.compute(self.expr.clone()) {
+                            if let Type::Number(i) = self.compute(self.expr.clone()) {
                                 if i == 0.0 {
                                     self.stmt = Vec::new();
                                     if let ExecutionMode::Script = self.execution_mode {
@@ -339,7 +339,7 @@ impl<'a> Executor<'a> {
                                     .execute_block(self.stmt.clone());
                                     match status {
                                         Some(j) => {
-                                            if let Type::Integer(k) = j {
+                                            if let Type::Number(k) = j {
                                                 if k == f64::MAX {
                                                     //状態が1(break)の時はループを抜け出す
                                                     break;
@@ -432,10 +432,10 @@ impl<'a> Executor<'a> {
                         println!("ループ回数を求めます");
                     }
                     let new_code = code.replacen("for", "", 1);
-                    self.count = if let Type::Integer(i) = self.compute(new_code) {
+                    self.count = if let Type::Number(i) = self.compute(new_code) {
                         i.round() as usize // ループ回数
                     } else {
-                        println!("エラー！ループ回数はInteger型です");
+                        println!("エラー！ループ回数は数値型です");
                         0
                     };
                     self.control_mode = ControlMode::For;
@@ -503,7 +503,7 @@ impl<'a> Executor<'a> {
                     for i in elements {
                         //文字列以外は式として扱われる
                         match self.compute(i.trim().to_string()) {
-                            Type::Integer(i) => {
+                            Type::Number(i) => {
                                 text += i.to_string().as_str();
                             }
                             Type::String(s) => {
@@ -551,7 +551,7 @@ impl<'a> Executor<'a> {
 
                     let mut value_max_len = 0;
                     for item in self.memory.iter() {
-                        if let Type::Integer(i) = item.value {
+                        if let Type::Number(i) = item.value {
                             if value_max_len < i.to_string().len() {
                                 value_max_len = i.to_string().len()
                             }
@@ -566,7 +566,7 @@ impl<'a> Executor<'a> {
                         for index in 0..self.memory.len() {
                             let vars = &self.memory[index];
                             match &vars.value {
-                                Type::Integer(i) => {
+                                Type::Number(i) => {
                                     println!(
                                         "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
                                         index, vars.name, i
@@ -651,7 +651,7 @@ impl<'a> Executor<'a> {
                     } else {
                         let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
                         let temp: i64 = rng.gen_range(
-                            if let Type::Integer(i) = self.compute({
+                            if let Type::Number(i) = self.compute({
                                 if let ExecutionMode::Script = self.execution_mode {
                                 } else {
                                     println!("最小値を求めます");
@@ -660,10 +660,10 @@ impl<'a> Executor<'a> {
                             }) {
                                 i.round() as i64
                             } else {
-                                println!("エラー！String型変数は使えません");
+                                println!("エラー！文字列型変数は使えません");
                                 0
                             },
-                            if let Type::Integer(i) = self.compute({
+                            if let Type::Number(i) = self.compute({
                                 if let ExecutionMode::Script = self.execution_mode {
                                 } else {
                                     println!("最小値を求めます");
@@ -672,7 +672,7 @@ impl<'a> Executor<'a> {
                             }) {
                                 i.round() as i64
                             } else {
-                                println!("エラー！String型変数は使えません");
+                                println!("エラー！文字列型変数は使えません");
                                 1
                             },
                         );
@@ -694,7 +694,7 @@ impl<'a> Executor<'a> {
                     } else {
                         println!("ループを脱出します");
                     }
-                    return Some(Type::Integer(f64::MAX)); //ステータスコード
+                    return Some(Type::Number(f64::MAX)); //ステータスコード
                 } else if code == "exit" {
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
@@ -851,7 +851,7 @@ impl<'a> Executor<'a> {
 
                 let mut value_max_len = 0;
                 for item in self.memory.iter() {
-                    if let Type::Integer(i) = item.value {
+                    if let Type::Number(i) = item.value {
                         if value_max_len < i.to_string().len() {
                             value_max_len = i.to_string().len()
                         }
@@ -866,7 +866,7 @@ impl<'a> Executor<'a> {
                     for index in 0..self.memory.len() {
                         let vars = &self.memory[index];
                         match &vars.value {
-                            Type::Integer(i) => {
+                            Type::Number(i) => {
                                 println!(
                                     "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
                                     index, vars.name, i
@@ -947,7 +947,7 @@ impl<'a> Executor<'a> {
     fn call_function(&mut self, item: String) -> Type {
         if !item.contains("(") {
             println!("エラー! 関数にはカッコをつけてください");
-            return Type::Integer(0.0);
+            return Type::Number(0.0);
         }
         let new_lines: Vec<String> = item
             .trim()
@@ -981,7 +981,7 @@ impl<'a> Executor<'a> {
 
         let code = match self.get_function(name.clone()) {
             Some(func) => func.code,
-            None => return Type::Integer(0.0),
+            None => return Type::Number(0.0),
         };
 
         let function_args = self.get_function(name.clone()).unwrap().args.clone();
@@ -997,7 +997,7 @@ impl<'a> Executor<'a> {
                 Type::String(s) => {
                     pre.push(format!("var {i} = '{s}'")); // 引数は変数として扱われる
                 }
-                Type::Integer(f) => pre.push(format!("var {i} = {f}")),
+                Type::Number(f) => pre.push(format!("var {i} = {f}")),
             }
         }
 
@@ -1015,7 +1015,7 @@ impl<'a> Executor<'a> {
         }
         match instance.execute_block(code) {
             Some(indes) => indes,
-            None => Type::Integer(0.0),
+            None => Type::Number(0.0),
         }
     }
 
@@ -1122,7 +1122,7 @@ impl<'a> Executor<'a> {
                     Type::String(expr.replace("'", "").replace("\"", "").clone());
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
-                    println!("String型変数{name}のデータを更新しました");
+                    println!("文字列型変数{name}のデータを更新しました");
                 }
             } else {
                 //ない場合は新規に確保する
@@ -1133,7 +1133,7 @@ impl<'a> Executor<'a> {
                 });
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
-                    println!("メモリにString型変数を確保しました");
+                    println!("メモリに文字列型変数を確保しました");
                 }
             }
         } else if is_duplicate {
@@ -1146,7 +1146,7 @@ impl<'a> Executor<'a> {
             self.memory[address].value = self.compute(expr.clone());
             if let ExecutionMode::Script = self.execution_mode {
             } else {
-                println!("Integer型変数{name}のデータを更新しました");
+                println!("数値型変数{name}のデータを更新しました");
             }
         } else {
             //ない場合は新規に確保する
@@ -1161,7 +1161,7 @@ impl<'a> Executor<'a> {
             });
             if let ExecutionMode::Script = self.execution_mode {
             } else {
-                println!("メモリにInteger型変数を確保しました");
+                println!("メモリに数値型変数を確保しました");
             }
         }
     }
@@ -1184,7 +1184,7 @@ impl<'a> Executor<'a> {
         }
         match self.get_variable(name) {
             Some(i) => i.value,
-            None => Type::Integer(0.0),
+            None => Type::Number(0.0),
         }
     }
 
@@ -1273,7 +1273,7 @@ impl<'a> Executor<'a> {
                         .iter()
                         .map(|x| match x {
                             Type::String(s) => format!("'{s}'"),
-                            Type::Integer(i) => format!("{}", i.to_string()),
+                            Type::Number(i) => format!("{}", i.to_string()),
                         })
                         .collect::<Vec<String>>()
                         .join(", "),
@@ -1287,114 +1287,127 @@ impl<'a> Executor<'a> {
             }
 
             let item: Type = match item.parse::<f64>() {
-                Ok(i) => Type::Integer(i),
+                Ok(i) => Type::Number(i),
                 Err(_) => {
                     if item.contains("'") || item.contains("\"") {
                         Type::String(item.replace("'", "").replace("\"", ""))
                     } else {
                         let y = stack.pop();
+                        if let Some(Type::String(ref s)) = y {
+                            if let ExecutionMode::Script = self.execution_mode {
+                            } else {
+                                println!("エラー!文字列型変数{s}は演算できません");
+                            }
+                        }
+
                         let x = stack.pop();
+                        if let Some(Type::String(ref p)) = x {
+                            if let ExecutionMode::Script = self.execution_mode {
+                            } else {
+                                println!("エラー!文字列型変数{p}は演算できません");
+                            }
+                        }
                         match item {
-                            "+" => Type::Integer(
+                            "+" => Type::Number(
                                 {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } + {
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 },
                             ),
-                            "-" => Type::Integer(
+                            "-" => Type::Number(
                                 {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } - {
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 },
                             ),
-                            "*" => Type::Integer(
+                            "*" => Type::Number(
                                 {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } * {
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 },
                             ),
-                            "/" => Type::Integer(
+                            "/" => Type::Number(
                                 {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } / {
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 },
                             ),
-                            "%" => Type::Integer(
+                            "%" => Type::Number(
                                 {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } % {
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 },
                             ),
-                            "^" => Type::Integer(
+                            "^" => Type::Number(
                                 {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 }
                                 .powf(
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     },
                                 ),
                             ),
-                            "=" => Type::Integer(
+                            "=" => Type::Number(
                                 if {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } == {
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
@@ -1405,16 +1418,16 @@ impl<'a> Executor<'a> {
                                     0.0
                                 },
                             ),
-                            "&" => Type::Integer(
+                            "&" => Type::Number(
                                 if {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } != 0.0
                                     && 0.0 != {
-                                        if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                        if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                             i
                                         } else {
                                             0.0
@@ -1426,16 +1439,16 @@ impl<'a> Executor<'a> {
                                     0.0
                                 },
                             ),
-                            "|" => Type::Integer(
+                            "|" => Type::Number(
                                 if {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } != 0.0
                                     || 0.0 != {
-                                        if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                        if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                             i
                                         } else {
                                             0.0
@@ -1447,15 +1460,15 @@ impl<'a> Executor<'a> {
                                     0.0
                                 },
                             ),
-                            ">" => Type::Integer(
+                            ">" => Type::Number(
                                 if {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } > {
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
@@ -1466,15 +1479,15 @@ impl<'a> Executor<'a> {
                                     0.0
                                 },
                             ),
-                            "<" => Type::Integer(
+                            "<" => Type::Number(
                                 if {
-                                    if let Type::Integer(i) = x.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
                                     }
                                 } < {
-                                    if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                         i
                                     } else {
                                         0.0
@@ -1490,9 +1503,9 @@ impl<'a> Executor<'a> {
                                     stack.push(i);
                                 };
 
-                                Type::Integer(
+                                Type::Number(
                                     if 0.0 == {
-                                        if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                        if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                             i
                                         } else {
                                             0.0
@@ -1513,8 +1526,7 @@ impl<'a> Executor<'a> {
                                     println!("ポインタがさす値を求めます");
                                 }
                                 if {
-                                    if let Type::Integer(i) =
-                                        y.clone().unwrap_or(Type::Integer(0.0))
+                                    if let Type::Number(i) = y.clone().unwrap_or(Type::Number(0.0))
                                     {
                                         i
                                     } else {
@@ -1525,10 +1537,10 @@ impl<'a> Executor<'a> {
                                     > &self.memory.len() - 1
                                 {
                                     println!("エラー!アドレスが不正です");
-                                    Type::Integer(0.0)
+                                    Type::Number(0.0)
                                 } else {
                                     self.memory[{
-                                        if let Type::Integer(i) = y.unwrap_or(Type::Integer(0.0)) {
+                                        if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
                                             i
                                         } else {
                                             0.0
@@ -1557,14 +1569,14 @@ impl<'a> Executor<'a> {
 
             stack.push(item);
         }
-        let result = stack.pop().unwrap_or(Type::Integer(0.0));
+        let result = stack.pop().unwrap_or(Type::Number(0.0));
         if let ExecutionMode::Script = self.execution_mode {
         } else {
             println!(
                 "結果 = {}",
                 match result {
                     Type::String(ref s) => format!("'{s}'"),
-                    Type::Integer(i) => format!("{i}"),
+                    Type::Number(i) => format!("{i}"),
                 }
             );
         }
