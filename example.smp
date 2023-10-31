@@ -25,17 +25,17 @@ print'Build on Simple programing language'
 
 
 while true
-    # 無限に入力を受け付ける
+    #無限に入力を受け付ける
     input number
 
     if number false =　
         print'終了します'
-        break # 入力が間違えていたら終了
+        break #入力が間違えていたら終了
     end if
 
-    ref ptr = number # numberの参照
+    ref ptr = number #numberの参照
     
-    prime関数を呼び出す
+    #prime関数を呼び出す
     if prime(ptr) true =
         var text = 'は素数です'
     else #表示するテキスト
