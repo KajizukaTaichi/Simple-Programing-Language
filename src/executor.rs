@@ -501,7 +501,6 @@ impl<'a> Executor<'a> {
                         elements
                     };
                     for i in elements {
-                        //文字列以外は式として扱われる
                         match self.compute(i.trim().to_string()) {
                             Type::Number(i) => {
                                 text += i.to_string().as_str();
@@ -1199,49 +1198,43 @@ impl<'a> Executor<'a> {
 
     /// 式の計算
     fn compute(&mut self, expr: String) -> Type {
-        let tokens: Vec<String> = {
+        fn tokenize_expression(expr: &str) -> Vec<String> {
             let mut elements = Vec::new();
-            let mut stack = 0;
-            let buffer = String::new();
-
-            for c in expr.chars() {
-                let mut buffer = String::new();
-                match c {
-                    '(' => {
-                        stack += 1;
-                        buffer.push('(');
-                    }
-                    ')' => {
-                        stack -= 1;
-                        buffer.push(')');
-                    }
-                    ' ' | '　' if stack == 0 => {
-                        elements.push(buffer.clone());
-                        buffer.clear();
-                    }
-                    _ => {
-                        buffer.push(c);
-                    }
-                }
-            }
-
-            if !buffer.is_empty() {
-                elements.push(buffer);
-            }
             let mut buffer = String::new();
+            let mut in_quotes = false;
+            let mut in_brackets = 0;
+
             for c in expr.chars() {
                 match c {
-                    '"' => {
-                        stack += 1;
+                    '"' if !in_quotes => {
+                        in_quotes = true;
                         buffer.push('"');
                     }
-                    '\'' => {
-                        stack -= 1;
+                    '\'' if !in_quotes => {
+                        in_quotes = true;
                         buffer.push('\'');
                     }
-                    ' ' | '　' if stack == 0 => {
-                        elements.push(buffer.clone());
-                        buffer.clear();
+                    '"' if in_quotes => {
+                        in_quotes = false;
+                        buffer.push('"');
+                    }
+                    '\'' if in_quotes => {
+                        in_quotes = false;
+                        buffer.push('\'');
+                    }
+                    '(' if !in_quotes => {
+                        in_brackets += 1;
+                        buffer.push('(');
+                    }
+                    ')' if !in_quotes => {
+                        in_brackets -= 1;
+                        buffer.push(')');
+                    }
+                    ' ' | '　' if !in_quotes && in_brackets == 0 => {
+                        if !buffer.is_empty() {
+                            elements.push(buffer.clone());
+                            buffer.clear();
+                        }
                     }
                     _ => {
                         buffer.push(c);
@@ -1254,7 +1247,9 @@ impl<'a> Executor<'a> {
             }
 
             elements
-        };
+        }
+
+        let tokens: Vec<String> = tokenize_expression(&expr);
         let mut stack: Vec<Type> = Vec::new();
         if let ExecutionMode::Script = self.execution_mode {
         } else {
@@ -1282,294 +1277,146 @@ impl<'a> Executor<'a> {
             }
 
             if item.contains("(") {
-                stack.push(self.call_function(item.to_string()));
+                (self.call_function(item.to_string()));
                 continue;
             }
 
-            let item: Type = match item.parse::<f64>() {
-                Ok(i) => Type::Number(i),
+            match item.parse::<f64>() {
+                Ok(i) => stack.push(Type::Number(i)),
                 Err(_) => {
                     if item.contains("'") || item.contains("\"") {
-                        Type::String(item.replace("'", "").replace("\"", ""))
+                        stack.push(Type::String(item.to_string()));
                     } else {
-                        let y = stack.pop();
-                        if let Some(Type::String(ref s)) = y {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("エラー!文字列型変数{s}は演算できません");
-                            }
-                        }
+                        if self.reference_variable(item.to_string()).is_none() {
+                            let y;
+                            match stack.pop() {
+                                Some(i) => y = i,
+                                None => continue,
+                            };
+                            let x;
+                            match stack.pop() {
+                                Some(i) => x = i,
+                                None => continue,
+                            };
 
-                        let x = stack.pop();
-                        if let Some(Type::String(ref p)) = x {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("エラー!文字列型変数{p}は演算できません");
-                            }
-                        }
-                        match item {
-                            "+" => Type::Number(
-                                {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } + {
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                },
-                            ),
-                            "-" => Type::Number(
-                                {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } - {
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                },
-                            ),
-                            "*" => Type::Number(
-                                {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } * {
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                },
-                            ),
-                            "/" => Type::Number(
-                                {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } / {
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                },
-                            ),
-                            "%" => Type::Number(
-                                {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } % {
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                },
-                            ),
-                            "^" => Type::Number(
-                                {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                }
-                                .powf(
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    },
-                                ),
-                            ),
-                            "=" => Type::Number(
-                                if {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } == {
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } {
-                                    1.0
-                                } else {
-                                    0.0
-                                },
-                            ),
-                            "&" => Type::Number(
-                                if {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } != 0.0
-                                    && 0.0 != {
-                                        if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                            i
-                                        } else {
-                                            0.0
+                            match (x.clone(), y.clone()) {
+                                (Type::String(s1), Type::String(s2)) => {
+                                    let y = s1;
+                                    let x = s2;
+                                    match item {
+                                        "+" => stack.push(Type::String(x + &y)),
+                                        "=" => {
+                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
+                                        }
+                                        _ => {
+                                            println!("エラー!この演算子はサポートされていません")
                                         }
                                     }
-                                {
-                                    1.0 // 論理値はfalseを0.0,trueを1.0として表す
-                                } else {
-                                    0.0
-                                },
-                            ),
-                            "|" => Type::Number(
-                                if {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } != 0.0
-                                    || 0.0 != {
-                                        if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                            i
-                                        } else {
-                                            0.0
-                                        }
-                                    }
-                                {
-                                    1.0 // 論理値はfalseを0.0,trueを1.0として表す
-                                } else {
-                                    0.0
-                                },
-                            ),
-                            ">" => Type::Number(
-                                if {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } > {
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } {
-                                    1.0 // 論理値はfalseを0.0,trueを1.0として表す
-                                } else {
-                                    0.0
-                                },
-                            ),
-                            "<" => Type::Number(
-                                if {
-                                    if let Type::Number(i) = x.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } < {
-                                    if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                } {
-                                    1.0 // 論理値はfalseを0.0,trueを1.0として表す
-                                } else {
-                                    0.0
-                                },
-                            ),
-                            "!" => {
-                                if let Some(i) = x {
-                                    stack.push(i);
-                                };
-
-                                Type::Number(
-                                    if 0.0 == {
-                                        if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                            i
-                                        } else {
-                                            0.0
-                                        }
-                                    } {
-                                        1.0 // 論理値はfalseを0.0,trueを1.0として表す
-                                    } else {
-                                        0.0
-                                    },
-                                )
-                            }
-                            "~" => {
-                                if let Some(i) = x {
-                                    stack.push(i);
-                                }
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("ポインタがさす値を求めます");
-                                }
-                                if {
-                                    if let Type::Number(i) = y.clone().unwrap_or(Type::Number(0.0))
-                                    {
-                                        i
-                                    } else {
-                                        0.0
-                                    }
-                                }
-                                .round() as usize
-                                    > &self.memory.len() - 1
-                                {
-                                    println!("エラー!アドレスが不正です");
-                                    Type::Number(0.0)
-                                } else {
-                                    self.memory[{
-                                        if let Type::Number(i) = y.unwrap_or(Type::Number(0.0)) {
-                                            i
-                                        } else {
-                                            0.0
-                                        }
-                                    }
-                                    .round()
-                                        as usize]
-                                        .value
-                                        .clone()
-                                }
-                            }
-                            _ => {
-                                if let Some(i) = x {
-                                    stack.push(i);
-                                }
-                                if let Some(i) = y {
-                                    stack.push(i);
+                                    continue;
                                 }
 
-                                self.get_variable_value(item.to_string())
+                                (Type::Number(f1), Type::Number(f2)) => {
+                                    let y = f1;
+                                    let x = f2;
+                                    match item {
+                                        "+" => stack.push(Type::Number(x + y)),
+                                        "-" => stack.push(Type::Number(x - y)),
+                                        "*" => stack.push(Type::Number(x * y)),
+                                        "/" => stack.push(Type::Number(x / y)),
+                                        "%" => stack.push(Type::Number(x % y)),
+                                        "^" => stack.push(Type::Number(x.powf(y))),
+                                        "=" => {
+                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
+                                        }
+                                        "&" => stack.push(Type::Number(if x != 0.0 && y != 0.0 {
+                                            1.0 // 論理値はfalseを0.0,trueを1.0として表す
+                                        } else {
+                                            0.0
+                                        })),
+                                        "|" => stack.push(Type::Number(if x != 0.0 || y != 0.0 {
+                                            1.0
+                                        } else {
+                                            0.0
+                                        })),
+                                        ">" => {
+                                            stack.push(Type::Number(if x > y { 1.0 } else { 0.0 }))
+                                        }
+                                        "<" => {
+                                            stack.push(Type::Number(if x < y { 1.0 } else { 0.0 }))
+                                        }
+                                        "!" => {
+                                            stack.push(Type::Number(x));
+                                            stack.push(Type::Number(if y == 0.0 {
+                                                1.0
+                                            } else {
+                                                0.0
+                                            }))
+                                        }
+                                        "~" => {
+                                            stack.push(Type::Number(x));
+
+                                            stack.push({
+                                                if let ExecutionMode::Script = self.execution_mode {
+                                                } else {
+                                                    println!("ポインタがさす値を求めます");
+                                                }
+                                                if y.round() as usize > &self.memory.len() - 1 {
+                                                    println!("エラー!アドレスが不正です");
+                                                    Type::Number(0.0)
+                                                } else {
+                                                    self.memory[y.round() as usize].value.clone()
+                                                }
+                                            })
+                                        }
+                                        _ => {
+                                            stack.push(Type::Number(x));
+                                            stack.push(Type::Number(y));
+
+                                            stack.push(self.get_variable_value(item.to_string()));
+                                        }
+                                    }
+                                }
+                                (Type::Number(s1), Type::String(s2)) => {
+                                    let y = s1.to_string();
+                                    let x = s2;
+                                    match item {
+                                        "+" => stack.push(Type::String(x + &y)),
+                                        "=" => {
+                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
+                                        }
+                                        _ => {
+                                            println!("エラー!この演算子はサポートされていません")
+                                        }
+                                    }
+                                    continue;
+                                }
+                                (Type::String(s1), Type::Number(s2)) => {
+                                    let y = s1;
+                                    let x = s2.to_string();
+                                    match item {
+                                        "+" => stack.push(Type::String(x + &y)),
+                                        "=" => {
+                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
+                                        }
+                                        _ => {
+                                            println!("エラー!この演算子はサポートされていません")
+                                        }
+                                    }
+                                    continue;
+                                }
                             }
+                        } else {
+                            stack.push(self.get_variable_value(item.to_string()));
                         }
                     }
                 }
-            };
-
-            stack.push(item);
+            }
         }
-        let result = stack.pop().unwrap_or(Type::Number(0.0));
+        let result = match stack.pop().unwrap_or(Type::Number(0.0)) {
+            Type::String(ref s) => Type::String(s.replace("'", "").replace('"', "")),
+            Type::Number(i) => Type::Number(i),
+        };
+
         if let ExecutionMode::Script = self.execution_mode {
         } else {
             println!(
