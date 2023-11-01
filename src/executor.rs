@@ -442,12 +442,10 @@ impl<'a> Executor<'a> {
                 } else if code.contains("if") {
                     let new_code = code.replacen("if", "", 1);
                     self.expr = new_code;
-
                     self.control_mode = ControlMode::If
                 } else if code.contains("while") {
                     let new_code = code.replacen("while", "", 1);
                     self.expr = new_code;
-
                     self.control_mode = ControlMode::While;
                 } else if code.contains("input") {
                     // 標準入力
@@ -506,7 +504,7 @@ impl<'a> Executor<'a> {
                                 text += i.to_string().as_str();
                             }
                             Type::String(s) => {
-                                text += s.as_str();
+                                text += s.replace("'", "").replace('"', "").as_str();
                             }
                         }
                     }
@@ -933,10 +931,6 @@ impl<'a> Executor<'a> {
         {
             Some(index) => Some(index),
             None => {
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("変数{name}が見つかりません");
-                }
                 None
             }
         }
@@ -1168,9 +1162,12 @@ impl<'a> Executor<'a> {
     /// 変数を取得する
     fn get_variable(&mut self, name: String) -> Option<Variable> {
         let name = name.trim().replace(" ", "").replace("　", "");
-        let index = match self.reference_variable(name) {
+        let index = match self.reference_variable(name.clone()) {
             Some(i) => i,
-            None => return None,
+            None => return {if let ExecutionMode::Script = self.execution_mode {
+                } else {
+                    println!("変数{name}が見つかりません");
+                }None},
         };
         return Some(self.memory[index].clone());
     }
@@ -1263,11 +1260,11 @@ impl<'a> Executor<'a> {
             if let ExecutionMode::Script = self.execution_mode {
             } else {
                 println!(
-                    "| Stack: [{}]  ←  '{}'",
+                    "| Stack: [{}]  ←  {}",
                     stack
                         .iter()
                         .map(|x| match x {
-                            Type::String(s) => format!("'{s}'"),
+                            Type::String(s) => format!("{s}"),
                             Type::Number(i) => format!("{}", i.to_string()),
                         })
                         .collect::<Vec<String>>()
@@ -1288,18 +1285,63 @@ impl<'a> Executor<'a> {
                         stack.push(Type::String(item.to_string()));
                     } else {
                         if self.reference_variable(item.to_string()).is_none() {
+                            match item {
+                                "!" => {
+                                    let y;
+                                    match stack.pop() {
+                                        Some(i) => {
+                                            y = match i {
+                                                Type::Number(i) => i,
+                                                _ => 0.0,
+                                            }
+                                        }
+                                        None => continue,
+                                    }
+                                    stack.push(Type::Number(if y == 0.0 { 1.0 } else { 0.0 }));
+                                    continue
+                                }
+                                "~" => {
+                                    let y;
+                                    match stack.pop() {
+                                        Some(i) => {
+                                            y = match i {
+                                                Type::Number(i) => i,
+                                                _ => 0.0,
+                                            }
+                                        }
+                                        None => continue,
+                                    }
+
+                                    stack.push({
+                                        if let ExecutionMode::Script = self.execution_mode {
+                                        } else {
+                                            println!("ポインタがさす値を求めます");
+                                        }
+                                        if y.round() as usize > &self.memory.len() - 1 {
+                                            println!("エラー!アドレスが不正です");
+                                            Type::Number(0.0)
+                                        } else {
+                                            self.memory[y.round() as usize].value.clone()
+                                        }
+                                    });
+                                    continue
+                                }
+                                _ => {}
+                            }
+
                             let y;
                             match stack.pop() {
                                 Some(i) => y = i,
                                 None => continue,
-                            };
+                            }
+
                             let x;
                             match stack.pop() {
                                 Some(i) => x = i,
                                 None => continue,
                             };
 
-                            match (x.clone(), y.clone()) {
+                            match (y.clone(), x.clone()) {
                                 (Type::String(s1), Type::String(s2)) => {
                                     let y = s1;
                                     let x = s2;
@@ -1344,35 +1386,8 @@ impl<'a> Executor<'a> {
                                         "<" => {
                                             stack.push(Type::Number(if x < y { 1.0 } else { 0.0 }))
                                         }
-                                        "!" => {
-                                            stack.push(Type::Number(x));
-                                            stack.push(Type::Number(if y == 0.0 {
-                                                1.0
-                                            } else {
-                                                0.0
-                                            }))
-                                        }
-                                        "~" => {
-                                            stack.push(Type::Number(x));
-
-                                            stack.push({
-                                                if let ExecutionMode::Script = self.execution_mode {
-                                                } else {
-                                                    println!("ポインタがさす値を求めます");
-                                                }
-                                                if y.round() as usize > &self.memory.len() - 1 {
-                                                    println!("エラー!アドレスが不正です");
-                                                    Type::Number(0.0)
-                                                } else {
-                                                    self.memory[y.round() as usize].value.clone()
-                                                }
-                                            })
-                                        }
                                         _ => {
-                                            stack.push(Type::Number(x));
-                                            stack.push(Type::Number(y));
-
-                                            stack.push(self.get_variable_value(item.to_string()));
+                                            println!("エラー!この演算子はサポートされていません")
                                         }
                                     }
                                 }
@@ -1413,7 +1428,7 @@ impl<'a> Executor<'a> {
             }
         }
         let result = match stack.pop().unwrap_or(Type::Number(0.0)) {
-            Type::String(ref s) => Type::String(s.replace("'", "").replace('"', "")),
+            Type::String(ref s) => Type::String(s.to_string()),
             Type::Number(i) => Type::Number(i),
         };
 
