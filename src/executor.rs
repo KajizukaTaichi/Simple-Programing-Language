@@ -436,16 +436,14 @@ impl<'a> Executor<'a> {
                         i.round() as usize // ループ回数
                     } else {
                         println!("エラー！ループ回数は数値型です");
-                        0
+                        1
                     };
                     self.control_mode = ControlMode::For;
                 } else if code.contains("if") {
-                    let new_code = code.replacen("if", "", 1);
-                    self.expr = new_code;
+                    self.expr = code.replacen("if", "", 1);
                     self.control_mode = ControlMode::If
                 } else if code.contains("while") {
-                    let new_code = code.replacen("while", "", 1);
-                    self.expr = new_code;
+                    self.expr = code.replacen("while", "", 1);
                     self.control_mode = ControlMode::While;
                 } else if code.contains("input") {
                     // 標準入力
@@ -924,16 +922,7 @@ impl<'a> Executor<'a> {
     /// 変数の参照
     fn reference_variable(&mut self, name: String) -> Option<usize> {
         let name = name.trim().replace(" ", "").replace("　", "");
-        match self
-            .memory
-            .iter()
-            .position(|x| x.name == name.trim().replace(" ", ""))
-        {
-            Some(index) => Some(index),
-            None => {
-                None
-            }
-        }
+        self.memory.iter().position(|x| x.name == name)
     }
 
     ///　関数を呼び出す
@@ -1106,30 +1095,8 @@ impl<'a> Executor<'a> {
             }
             flag
         };
-        if expr.contains("\"") || expr.contains("'") {
-            if is_duplicate {
-                //　変数が在る場合は更新する
-                let address = self.reference_variable(name.clone()).unwrap_or(0);
 
-                self.memory[address].value =
-                    Type::String(expr.replace("'", "").replace("\"", "").clone());
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("文字列型変数{name}のデータを更新しました");
-                }
-            } else {
-                //ない場合は新規に確保する
-                let value = Type::String(expr.replace("'", "").replace("\"", "").clone());
-                self.memory.push(Variable {
-                    name: name.clone(),
-                    value,
-                });
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("メモリに文字列型変数を確保しました");
-                }
-            }
-        } else if is_duplicate {
+        if is_duplicate {
             //　変数が在る場合は更新する
             let address = self.reference_variable(name.clone()).unwrap_or(0);
             if let ExecutionMode::Script = self.execution_mode {
@@ -1139,7 +1106,7 @@ impl<'a> Executor<'a> {
             self.memory[address].value = self.compute(expr.clone());
             if let ExecutionMode::Script = self.execution_mode {
             } else {
-                println!("数値型変数{name}のデータを更新しました");
+                println!("変数{name}のデータを更新しました");
             }
         } else {
             //ない場合は新規に確保する
@@ -1154,7 +1121,7 @@ impl<'a> Executor<'a> {
             });
             if let ExecutionMode::Script = self.execution_mode {
             } else {
-                println!("メモリに数値型変数を確保しました");
+                println!("メモリに変数を確保しました");
             }
         }
     }
@@ -1164,10 +1131,15 @@ impl<'a> Executor<'a> {
         let name = name.trim().replace(" ", "").replace("　", "");
         let index = match self.reference_variable(name.clone()) {
             Some(i) => i,
-            None => return {if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("変数{name}が見つかりません");
-                }None},
+            None => {
+                return {
+                    if let ExecutionMode::Script = self.execution_mode {
+                    } else {
+                        println!("変数{name}が見つかりません");
+                    }
+                    None
+                }
+            }
         };
         return Some(self.memory[index].clone());
     }
@@ -1195,6 +1167,7 @@ impl<'a> Executor<'a> {
 
     /// 式の計算
     fn compute(&mut self, expr: String) -> Type {
+        /// 式をトークンに分ける
         fn tokenize_expression(expr: &str) -> Vec<String> {
             let mut elements = Vec::new();
             let mut buffer = String::new();
@@ -1264,7 +1237,7 @@ impl<'a> Executor<'a> {
                     stack
                         .iter()
                         .map(|x| match x {
-                            Type::String(s) => format!("{s}"),
+                            Type::String(s) => format!("'{s}'"),
                             Type::Number(i) => format!("{}", i.to_string()),
                         })
                         .collect::<Vec<String>>()
@@ -1274,154 +1247,168 @@ impl<'a> Executor<'a> {
             }
 
             if item.contains("(") {
-                (self.call_function(item.to_string()));
+                stack.push(self.call_function(item.to_string()));
                 continue;
             }
 
             match item.parse::<f64>() {
                 Ok(i) => stack.push(Type::Number(i)),
                 Err(_) => {
-                    if item.contains("'") || item.contains("\"") {
-                        stack.push(Type::String(item.to_string()));
+                    if self.reference_variable(item.to_string()).is_some() {
+                        stack.push(self.get_variable_value(item.to_string()));
                     } else {
-                        if self.reference_variable(item.to_string()).is_none() {
-                            match item {
-                                "!" => {
-                                    let y;
-                                    match stack.pop() {
-                                        Some(i) => {
-                                            y = match i {
-                                                Type::Number(i) => i,
-                                                _ => 0.0,
+                        // オペランドが一つの演算子
+                        match item {
+                            "!" => {
+                                let y;
+                                match stack.pop() {
+                                    Some(i) => {
+                                        y = match i {
+                                            Type::Number(i) => i,
+                                            _ => 0.0,
+                                        }
+                                    }
+                                    None => continue,
+                                }
+                                stack.push(Type::Number(if y == 0.0 { 1.0 } else { 0.0 }));
+                                continue;
+                            }
+                            "~" => {
+                                let y;
+                                match stack.pop() {
+                                    Some(i) => {
+                                        y = match i {
+                                            Type::Number(i) => i,
+                                            _ => 0.0,
+                                        }
+                                    }
+                                    None => continue,
+                                }
+
+                                stack.push({
+                                    if let ExecutionMode::Script = self.execution_mode {
+                                    } else {
+                                        println!("ポインタがさす値を求めます");
+                                    }
+                                    if y.round() as usize > &self.memory.len() - 1 {
+                                        println!("エラー!アドレスが不正です");
+                                        Type::Number(0.0)
+                                    } else {
+                                        self.memory[y.round() as usize].value.clone()
+                                    }
+                                });
+                                continue;
+                            }
+                            _ => {
+                                let y;
+                                match stack.pop() {
+                                    Some(i) => y = i,
+                                    None => y = Type::Number(0.0),
+                                }
+
+                                let x;
+                                match stack.pop() {
+                                    Some(i) => x = i,
+                                    None => x = Type::Number(0.0),
+                                };
+
+                                match (y.clone(), x.clone()) {
+                                    (Type::String(s1), Type::String(s2)) => {
+                                        let y = s1;
+                                        let x = s2;
+                                        match item {
+                                            "+" => stack.push(Type::String(x + &y)),
+                                            "=" => stack.push(Type::Number(if x == y {
+                                                1.0
+                                            } else {
+                                                0.0
+                                            })),
+                                            _ => {
+                                                // 文字列として処理する
+                                                stack.push(Type::String(item.to_string()));
                                             }
                                         }
-                                        None => continue,
                                     }
-                                    stack.push(Type::Number(if y == 0.0 { 1.0 } else { 0.0 }));
-                                    continue
-                                }
-                                "~" => {
-                                    let y;
-                                    match stack.pop() {
-                                        Some(i) => {
-                                            y = match i {
-                                                Type::Number(i) => i,
-                                                _ => 0.0,
+
+                                    (Type::Number(f1), Type::Number(f2)) => {
+                                        let y = f1;
+                                        let x = f2;
+                                        match item {
+                                            "+" => stack.push(Type::Number(x + y)),
+                                            "-" => stack.push(Type::Number(x - y)),
+                                            "*" => stack.push(Type::Number(x * y)),
+                                            "/" => stack.push(Type::Number(x / y)),
+                                            "%" => stack.push(Type::Number(x % y)),
+                                            "^" => stack.push(Type::Number(x.powf(y))),
+                                            "=" => stack.push(Type::Number(if x == y {
+                                                1.0
+                                            } else {
+                                                0.0
+                                            })),
+                                            "&" => {
+                                                stack.push(Type::Number(if x != 0.0 && y != 0.0 {
+                                                    1.0 // 論理値はfalseを0.0,trueを1.0として表す
+                                                } else {
+                                                    0.0
+                                                }))
+                                            }
+                                            "|" => {
+                                                stack.push(Type::Number(if x != 0.0 || y != 0.0 {
+                                                    1.0
+                                                } else {
+                                                    0.0
+                                                }))
+                                            }
+                                            ">" => stack.push(Type::Number(if x > y {
+                                                1.0
+                                            } else {
+                                                0.0
+                                            })),
+                                            "<" => stack.push(Type::Number(if x < y {
+                                                1.0
+                                            } else {
+                                                0.0
+                                            })),
+                                            _ => {
+                                                // 文字列として処理する
+                                                stack.push(Type::String(item.to_string()));
                                             }
                                         }
-                                        None => continue,
                                     }
-
-                                    stack.push({
-                                        if let ExecutionMode::Script = self.execution_mode {
-                                        } else {
-                                            println!("ポインタがさす値を求めます");
-                                        }
-                                        if y.round() as usize > &self.memory.len() - 1 {
-                                            println!("エラー!アドレスが不正です");
-                                            Type::Number(0.0)
-                                        } else {
-                                            self.memory[y.round() as usize].value.clone()
-                                        }
-                                    });
-                                    continue
-                                }
-                                _ => {}
-                            }
-
-                            let y;
-                            match stack.pop() {
-                                Some(i) => y = i,
-                                None => continue,
-                            }
-
-                            let x;
-                            match stack.pop() {
-                                Some(i) => x = i,
-                                None => continue,
-                            };
-
-                            match (y.clone(), x.clone()) {
-                                (Type::String(s1), Type::String(s2)) => {
-                                    let y = s1;
-                                    let x = s2;
-                                    match item {
-                                        "+" => stack.push(Type::String(x + &y)),
-                                        "=" => {
-                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
-                                        }
-                                        _ => {
-                                            println!("エラー!この演算子はサポートされていません")
+                                    (Type::Number(s1), Type::String(s2)) => {
+                                        let y = s1.to_string();
+                                        let x = s2;
+                                        match item {
+                                            "+" => stack.push(Type::String(x + &y)),
+                                            "=" => stack.push(Type::Number(if x == y {
+                                                1.0
+                                            } else {
+                                                0.0
+                                            })),
+                                            _ => {
+                                                // 文字列として処理する
+                                                stack.push(Type::String(item.to_string()));
+                                            }
                                         }
                                     }
-                                    continue;
-                                }
-
-                                (Type::Number(f1), Type::Number(f2)) => {
-                                    let y = f1;
-                                    let x = f2;
-                                    match item {
-                                        "+" => stack.push(Type::Number(x + y)),
-                                        "-" => stack.push(Type::Number(x - y)),
-                                        "*" => stack.push(Type::Number(x * y)),
-                                        "/" => stack.push(Type::Number(x / y)),
-                                        "%" => stack.push(Type::Number(x % y)),
-                                        "^" => stack.push(Type::Number(x.powf(y))),
-                                        "=" => {
-                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
-                                        }
-                                        "&" => stack.push(Type::Number(if x != 0.0 && y != 0.0 {
-                                            1.0 // 論理値はfalseを0.0,trueを1.0として表す
-                                        } else {
-                                            0.0
-                                        })),
-                                        "|" => stack.push(Type::Number(if x != 0.0 || y != 0.0 {
-                                            1.0
-                                        } else {
-                                            0.0
-                                        })),
-                                        ">" => {
-                                            stack.push(Type::Number(if x > y { 1.0 } else { 0.0 }))
-                                        }
-                                        "<" => {
-                                            stack.push(Type::Number(if x < y { 1.0 } else { 0.0 }))
-                                        }
-                                        _ => {
-                                            println!("エラー!この演算子はサポートされていません")
+                                    (Type::String(s1), Type::Number(s2)) => {
+                                        let y = s1; //型変換
+                                        let x = s2.to_string();
+                                        match item {
+                                            "+" => stack.push(Type::String(x + &y)),
+                                            "=" => stack.push(Type::Number(if x == y {
+                                                1.0
+                                            } else {
+                                                0.0
+                                            })),
+                                            _ => {
+                                                // 文字列として処理する
+                                                stack.push(Type::String(item.to_string()));
+                                            }
                                         }
                                     }
-                                }
-                                (Type::Number(s1), Type::String(s2)) => {
-                                    let y = s1.to_string();
-                                    let x = s2;
-                                    match item {
-                                        "+" => stack.push(Type::String(x + &y)),
-                                        "=" => {
-                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
-                                        }
-                                        _ => {
-                                            println!("エラー!この演算子はサポートされていません")
-                                        }
-                                    }
-                                    continue;
-                                }
-                                (Type::String(s1), Type::Number(s2)) => {
-                                    let y = s1;
-                                    let x = s2.to_string();
-                                    match item {
-                                        "+" => stack.push(Type::String(x + &y)),
-                                        "=" => {
-                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
-                                        }
-                                        _ => {
-                                            println!("エラー!この演算子はサポートされていません")
-                                        }
-                                    }
-                                    continue;
                                 }
                             }
-                        } else {
-                            stack.push(self.get_variable_value(item.to_string()));
                         }
                     }
                 }
