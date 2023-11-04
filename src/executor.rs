@@ -715,7 +715,7 @@ impl<'a> Executor<'a> {
 
             if let ControlMode::Normal = self.control_mode {
                 if let ExecutionMode::Script = self.execution_mode {
-                }else{
+                } else {
                     self.debug_menu();
                 }
             }
