@@ -116,9 +116,7 @@ impl<'a> Executor<'a> {
                             } else {
                                 println!("{}回目のループ", i + 1);
                             }
-                            if let ExecutionMode::Interactive = self.execution_mode {
-                                self.execution_mode = ExecutionMode::Debug
-                            }
+
                             let status = Executor::new(
                                 &mut self.memory,
                                 &mut self.name_space,
@@ -182,9 +180,7 @@ impl<'a> Executor<'a> {
                                 } else {
                                     println!("条件が一致したので、実行します");
                                 }
-                                if let ExecutionMode::Interactive = self.execution_mode {
-                                    self.execution_mode = ExecutionMode::Debug
-                                }
+
                                 let status = Executor::new(
                                     &mut self.memory,
                                     &mut self.name_space,
@@ -227,9 +223,7 @@ impl<'a> Executor<'a> {
                                 } else {
                                     println!("条件が一致しなかったので、elseのコードを実行します");
                                 }
-                                if let ExecutionMode::Interactive = self.execution_mode {
-                                    self.execution_mode = ExecutionMode::Debug
-                                }
+
                                 let status = Executor::new(
                                     &mut self.memory,
                                     &mut self.name_space,
@@ -250,9 +244,7 @@ impl<'a> Executor<'a> {
                                 } else {
                                     println!("条件が一致したので、実行します");
                                 }
-                                if let ExecutionMode::Interactive = self.execution_mode {
-                                    self.execution_mode = ExecutionMode::Debug
-                                }
+
                                 let status = Executor::new(
                                     &mut self.memory,
                                     &mut self.name_space,
@@ -362,10 +354,6 @@ impl<'a> Executor<'a> {
             }
 
             ControlMode::Normal => {
-                if let ExecutionMode::Debug = self.execution_mode {
-                    println!("〔 {code} 〕を実行します");
-                }
-
                 if code.contains("var") {
                     // 変数の定義
                     let new_code = code.replacen("var", "", 1);
@@ -705,19 +693,22 @@ impl<'a> Executor<'a> {
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
                     number = number + 1;
-                    print!("{number}行目の");
+                    println!("{number}行目の〔 {lin} 〕を実行します");
                 }
             }
-            if let Some(i) = self.execute(lin.to_string()) {
-                // 戻り値を返す
-                return Some(i);
-            }
+
+            let status = self.execute(lin.to_string());
 
             if let ControlMode::Normal = self.control_mode {
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
                     self.debug_menu();
                 }
+            }
+
+            if let Some(i) = status {
+                // 戻り値を返す
+                return Some(i);
             }
         }
         return None;
