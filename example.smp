@@ -14,7 +14,7 @@ func prime(ptr)
     end if　#2以上4未満は素数
 
     var count = 2
-    while count ptr ~ <
+    while count ptr ~ 0.5 ^ <
         if ptr ~ count % 0 =
             return false
         end if #割れるか確かめる
@@ -47,4 +47,4 @@ while true
     
     print ptr ~, text
 end while
- 
+　
