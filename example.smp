@@ -9,6 +9,10 @@ func prime(ptr)
         return false
     end if　#2未満は素数ではない
 
+    if ptr ~ 4 <
+        return true
+    end if　#2以上4未満は素数
+
     var count = 2
     while count ptr ~ <
         if ptr ~ count % 0 =
@@ -23,14 +27,13 @@ end func
 print'素数判定プログラム'
 print'Build on Simple programing language'
 
-
 while true
     #無限に入力を受け付ける
     input number
 
     if number false =　
         print'終了します'
-        break #入力が間違えていたら終了
+        break
     end if
 
     ref ptr = number #numberの参照
@@ -44,3 +47,4 @@ while true
     
     print ptr ~, text
 end while
+ 
