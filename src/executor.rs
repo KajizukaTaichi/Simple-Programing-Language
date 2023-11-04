@@ -129,8 +129,10 @@ impl<'a> Executor<'a> {
                                 Some(j) => {
                                     if let Type::Number(k) = j {
                                         if k == f64::MAX {
-                                            //状態が1(break)の時はループを抜け出す
+                                            //状態がbreakの時はループを抜け出す
                                             break;
+                                        } else if k == f64::MIN {
+                                            continue;
                                         } else {
                                             return Some(j);
                                         }
@@ -191,17 +193,8 @@ impl<'a> Executor<'a> {
                                 .execute_block(self.stmt.clone());
                                 match status {
                                     Some(j) => {
-                                        if let Type::Number(k) = j {
-                                            if k == f64::MAX {
-                                                //状態が1(break)の時はループを抜け出す
-                                                return Some(Type::Number(f64::MAX));
-                                            } else {
-                                                return Some(j);
-                                            }
-                                        } else {
-                                            // 戻り値を返す
-                                            return Some(j);
-                                        }
+                                        // 戻り値を返す
+                                        return Some(j);
                                     }
                                     None => {}
                                 }
@@ -245,17 +238,8 @@ impl<'a> Executor<'a> {
                                 .execute_block(self.else_stmt.clone());
                                 match status {
                                     Some(j) => {
-                                        if let Type::Number(k) = j {
-                                            if k == f64::MAX {
-                                                //状態が1(break)の時はループを抜け出す
-                                                return Some(Type::Number(f64::MAX));
-                                            } else {
-                                                return Some(j);
-                                            }
-                                        } else {
-                                            // 戻り値を返す
-                                            return Some(j);
-                                        }
+                                        // 戻り値を返す
+                                        return Some(j);
                                     }
                                     None => {}
                                 }
@@ -277,15 +261,8 @@ impl<'a> Executor<'a> {
                                 .execute_block(self.stmt.clone());
                                 match status {
                                     Some(j) => {
-                                        if let Type::Number(k) = j {
-                                            if k == f64::MAX {
-                                                //状態が1(break)の時はループを抜け出す
-                                                return Some(Type::Number(f64::MAX));
-                                            }
-                                        } else {
-                                            // 戻り値を返す
-                                            return Some(j);
-                                        }
+                                        // 戻り値を返す
+                                        return Some(j);
                                     }
                                     None => {}
                                 }
@@ -341,8 +318,10 @@ impl<'a> Executor<'a> {
                                         Some(j) => {
                                             if let Type::Number(k) = j {
                                                 if k == f64::MAX {
-                                                    //状態が1(break)の時はループを抜け出す
+                                                    //状態がbreakの時はループを抜け出す
                                                     break;
+                                                } else if k == f64::MIN {
+                                                    continue;
                                                 } else {
                                                     return Some(j);
                                                 }
@@ -690,6 +669,12 @@ impl<'a> Executor<'a> {
                         println!("ループを脱出します");
                     }
                     return Some(Type::Number(f64::MAX)); //ステータスコード
+                } else if code.contains("next") {
+                    if let ExecutionMode::Script = self.execution_mode {
+                    } else {
+                        println!("次のループへ移ります");
+                    }
+                    return Some(Type::Number(f64::MIN)); //ステータスコード
                 } else if code == "exit" {
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
@@ -728,13 +713,10 @@ impl<'a> Executor<'a> {
                 return Some(i);
             }
 
-            if code.iter().position(|x| x == lin) != Some(code.len() - 1) {
-                if lin != "" {
-                    if let ControlMode::Normal = self.control_mode {
-                        if let ExecutionMode::Debug = self.execution_mode {
-                            self.debug_menu();
-                        }
-                    }
+            if let ControlMode::Normal = self.control_mode {
+                if let ExecutionMode::Script = self.execution_mode {
+                }else{
+                    self.debug_menu();
                 }
             }
         }
