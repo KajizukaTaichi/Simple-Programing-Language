@@ -266,9 +266,7 @@ impl<'a> Executor<'a> {
                     }
                 } else if code.contains("if") {
                     self.nest_if += 1;
-                    self.stmt.push(code.to_string());
-
-                    self.control_mode = ControlMode::If;
+                    self.else_stmt.push(code.to_string());
                 } else {
                     self.else_stmt.push(code.to_string());
                 }
@@ -331,6 +329,7 @@ impl<'a> Executor<'a> {
                     }
                 } else if code.contains("while") {
                     self.nest_while += 1;
+                    self.stmt.push(code.to_string());
                 } else {
                     self.stmt.push(code.to_string());
                 }
@@ -348,6 +347,7 @@ impl<'a> Executor<'a> {
                     }
                 } else if code.contains("func") {
                     self.nest_func += 1;
+                    self.stmt.push(code.to_string());
                 } else {
                     self.stmt.push(code.to_string());
                 }
