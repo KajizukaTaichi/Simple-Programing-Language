@@ -361,12 +361,17 @@ impl<'a> Executor<'a> {
                     let code = &new_code;
                     let params: Vec<&str> = code.split("=").collect();
                     let name = params[0].trim().replace(" ", "");
-                    if let ExecutionMode::Script = self.execution_mode {
+                    if name.contains("[") {
+                        let value = self.compute(params[1..].join("=").to_string());
+                        self.set_list_value(name, value);
                     } else {
-                        println!("変数{}を定義します", name);
+                        if let ExecutionMode::Script = self.execution_mode {
+                        } else {
+                            println!("変数{}を定義します", name);
+                        }
+                        let expr = params[1..].join("=").to_string();
+                        self.set_variable(name, expr);
                     }
-                    let expr = params[1..].join("=").to_string();
-                    self.set_variable(name, expr);
                 } else if code.contains("func") {
                     //　関数の定義
                     if !code.contains("(") {
@@ -430,27 +435,23 @@ impl<'a> Executor<'a> {
                     } else {
                         println!("標準出力に表示します");
                     }
-                        match self.compute(new_code.trim().to_string()) {
-                            Type::Number(i) => {
-                                text += i.to_string().as_str();
-                            }
-                            Type::String(s) => {
-                                text += s.replace("'", "").replace('"', "").as_str();
-                            }
-                            Type::List(l) => {
-                                for i in l {
-                                    match i {
-                                        Type::Number(i) => {
-                                            text += format!("{}, ", i).as_str()
-                                        }
-                                        Type::String(s) => {
-                                            text += format!("'{}' , ", s).as_str()
-                                        }
-                                        _ => {}
-                                    }
+                    match self.compute(new_code.trim().to_string()) {
+                        Type::Number(i) => {
+                            text += i.to_string().as_str();
+                        }
+                        Type::String(s) => {
+                            text += s.replace("'", "").replace('"', "").as_str();
+                        }
+                        Type::List(l) => {
+                            for i in l {
+                                match i {
+                                    Type::Number(i) => text += format!("{}, ", i).as_str(),
+                                    Type::String(s) => text += format!("'{}' , ", s).as_str(),
+                                    _ => {}
                                 }
                             }
                         }
+                    }
                     if let ExecutionMode::Script = self.execution_mode {
                         println!("{text}");
                     } else {
@@ -918,16 +919,18 @@ impl<'a> Executor<'a> {
         let name: String = new_lines[0].replace(" ", "").replace("　", "").clone();
         if let Type::List(l) = self.get_variable_value(name.clone()) {
             return l[if let Type::Number(i) = self.compute(new_lines[1].clone()) {
+                let j = (i - 1.0) as usize;
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
                     println!("{name}のインデックス{i}の値を求めます");
                 }
-                if 0.0 <= i && (i as usize) < l.len() {
-                    i as usize
+                if j < l.len() {
+                    j
                 } else {
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
-                        println!("エラー!{i}は{name}のインデックス範囲外です")
+                        println!("エラー!{i}は{name}のインデックス範囲外です");
+                        return Type::Number(0.0);
                     };
                     0
                 }
@@ -941,6 +944,44 @@ impl<'a> Executor<'a> {
             .clone();
         } else {
             return Type::Number(0.0);
+        }
+    }
+
+    fn set_list_value(&mut self, item: String, value: Type) {
+        let new_lines: Vec<String> = item
+            .trim()
+            .replace("]", "")
+            .split("[")
+            .map(|s| s.to_string())
+            .collect();
+        let name: String = new_lines[0].replace(" ", "").replace("　", "").clone();
+        if let Type::List(mut l) = self.get_variable_value(name.clone()) {
+            let len = l.len();
+            l[if let Type::Number(i) = self.compute(new_lines[1].clone()) {
+                let j = (i - 1.0) as usize;
+                if let ExecutionMode::Script = self.execution_mode {
+                } else {
+                    println!("{name}のインデックス{i}の値を変更します");
+                }
+                if j < len {
+                    j
+                } else {
+                    if let ExecutionMode::Script = self.execution_mode {
+                    } else {
+                        println!("エラー!{i}は{name}のインデックス範囲外です");
+                        return;
+                    };
+                    0
+                }
+            } else {
+                if let ExecutionMode::Script = self.execution_mode {
+                } else {
+                    println!("エラー！インデックスは数値型です");
+                }
+                0
+            }] = value;
+            let address = self.reference_variable(name.clone()).unwrap_or(0);
+            self.memory[address].value = Type::List(l);
         }
     }
 
