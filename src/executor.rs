@@ -852,7 +852,7 @@ impl<'a> Executor<'a> {
                                         _ => {}
                                     }
                                 }
-                                println!("");
+                                println!("]");
                             }
                         }
                     }
@@ -918,7 +918,7 @@ impl<'a> Executor<'a> {
             .collect();
         let name: String = new_lines[0].replace(" ", "").replace("　", "").clone();
         if let Type::List(l) = self.get_variable_value(name.clone()) {
-            return l[if let Type::Number(i) = self.compute(new_lines[1].clone()) {
+            let index = if let Type::Number(i) = self.compute(new_lines[1].clone()) {
                 let j = (i - 1.0) as usize;
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
@@ -930,20 +930,31 @@ impl<'a> Executor<'a> {
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
                         println!("エラー!{i}は{name}のインデックス範囲外です");
-                        return Type::Number(0.0);
                     };
-                    0
+                    return Type::Number(0.0);
                 }
             } else {
+                if let Type::String(s) = self.compute(new_lines[1].clone()) {
+                    if let ExecutionMode::Script = self.execution_mode {
+                    } else {
+                        println!("{name}の長さを求めます");
+                    };
+                    if s.contains("len") {
+                        if let Type::List(l) = self.get_variable_value(name) {
+                            return Type::Number(l.len() as f64);
+                        }
+                    }
+                }
+
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
                     println!("エラー！インデックスは数値型です");
                 }
-                0
-            }]
-            .clone();
+                return Type::Number(0.0);
+            };
+            return l[index].clone();
         } else {
-            return Type::Number(0.0);
+            return self.get_variable_value(name.clone());
         }
     }
 
@@ -1174,8 +1185,11 @@ impl<'a> Executor<'a> {
             } else {
                 println!("値を求めます");
             }
-            if expr.contains("[") {
-                let expr = expr.replace("[", "").replace("]", "");
+            if expr.contains("[") && expr.contains("list") {
+                let expr = expr
+                    .replacen("list", "", 1)
+                    .replace("[", "")
+                    .replace("]", "");
                 let mut list: Vec<Type> = Vec::new();
                 for item in expr.split(",") {
                     list.push(self.compute(item.to_string()))
@@ -1194,8 +1208,11 @@ impl<'a> Executor<'a> {
             } else {
                 println!("値を求めます");
             }
-            if expr.contains("[") {
-                let expr = expr.replace("[", "").replace("]", "");
+            if expr.contains("[") && expr.contains("list") {
+                let expr = expr
+                    .replacen("list", "", 1)
+                    .replace("[", "")
+                    .replace("]", "");
                 let mut list: Vec<Type> = Vec::new();
                 for item in expr.split(",") {
                     list.push(self.compute(item.to_string()))
@@ -1316,6 +1333,7 @@ impl<'a> Executor<'a> {
             if !buffer.is_empty() {
                 elements.push(buffer);
             }
+            // dbg!(elements.clone());
             elements
         }
 
