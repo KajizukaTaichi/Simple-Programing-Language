@@ -15,6 +15,7 @@ fn input(prompt: &str) -> String {
 pub enum Type {
     Number(f64),
     String(String),
+    List(Vec<Type>),
 }
 
 /// 変数のデータ
@@ -359,15 +360,13 @@ impl<'a> Executor<'a> {
                     let new_code = code.replacen("var", "", 1);
                     let code = &new_code;
                     let params: Vec<&str> = code.split("=").collect();
+                    let name = params[0].trim().replace(" ", "");
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
-                        println!("変数{}を定義します", params[0].trim().replace(" ", ""));
+                        println!("変数{}を定義します", name);
                     }
-
-                    self.set_variable(
-                        params[0].trim().replace(" ", ""),
-                        params[1..].join("=").to_string(),
-                    );
+                    let expr = params[1..].join("=").to_string();
+                    self.set_variable(name, expr);
                 } else if code.contains("func") {
                     //　関数の定義
                     if !code.contains("(") {
@@ -427,52 +426,31 @@ impl<'a> Executor<'a> {
                     //　標準出力
                     let new_code = code.replacen("print", "", 1);
                     let mut text = String::new();
-                    let params = &new_code;
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
                         println!("標準出力に表示します");
                     }
-                    let elements: Vec<String> = {
-                        let mut elements = Vec::new();
-                        let mut buffer = String::new();
-                        let mut stack = 0;
-
-                        for c in params.chars() {
-                            match c {
-                                '(' => {
-                                    stack += 1;
-                                    buffer.push('(');
-                                }
-                                ')' => {
-                                    stack -= 1;
-                                    buffer.push(')');
-                                }
-                                ',' if stack == 0 => {
-                                    elements.push(buffer.clone());
-                                    buffer.clear();
-                                }
-                                _ => {
-                                    buffer.push(c);
-                                }
-                            }
-                        }
-
-                        if !buffer.is_empty() {
-                            elements.push(buffer);
-                        }
-
-                        elements
-                    };
-                    for i in elements {
-                        match self.compute(i.trim().to_string()) {
+                        match self.compute(new_code.trim().to_string()) {
                             Type::Number(i) => {
                                 text += i.to_string().as_str();
                             }
                             Type::String(s) => {
                                 text += s.replace("'", "").replace('"', "").as_str();
                             }
+                            Type::List(l) => {
+                                for i in l {
+                                    match i {
+                                        Type::Number(i) => {
+                                            text += format!("{}, ", i).as_str()
+                                        }
+                                        Type::String(s) => {
+                                            text += format!("'{}' , ", s).as_str()
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
                         }
-                    }
                     if let ExecutionMode::Script = self.execution_mode {
                         println!("{text}");
                     } else {
@@ -539,6 +517,22 @@ impl<'a> Executor<'a> {
                                         "| [{:>3}] {:<name_max_len$} : '{}' ",
                                         index, vars.name, s
                                     )
+                                }
+                                Type::List(l) => {
+                                    print!("| [{:>3}] {:<name_max_len$} : [", index, vars.name);
+
+                                    for i in l {
+                                        match i {
+                                            Type::Number(i) => {
+                                                print!("{:>value_max_len$}, ", i)
+                                            }
+                                            Type::String(s) => {
+                                                print!("'{}' , ", s)
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    println!("]");
                                 }
                             }
                         }
@@ -843,6 +837,22 @@ impl<'a> Executor<'a> {
                             Type::String(s) => {
                                 println!("| [{:>3}] {:<name_max_len$} : '{}' ", index, vars.name, s)
                             }
+                            Type::List(l) => {
+                                print!("| [{:>3}] {:<name_max_len$} : [", index, vars.name);
+
+                                for i in l {
+                                    match i {
+                                        Type::Number(i) => {
+                                            print!("{:>value_max_len$}, ", i)
+                                        }
+                                        Type::String(s) => {
+                                            print!("'{}' , ", s)
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                println!("");
+                            }
                         }
                     }
                 } else {
@@ -896,6 +906,42 @@ impl<'a> Executor<'a> {
     fn reference_variable(&mut self, name: String) -> Option<usize> {
         let name = name.trim().replace(" ", "").replace("　", "");
         self.memory.iter().position(|x| x.name == name)
+    }
+
+    fn get_list_value(&mut self, item: String) -> Type {
+        let new_lines: Vec<String> = item
+            .trim()
+            .replace("]", "")
+            .split("[")
+            .map(|s| s.to_string())
+            .collect();
+        let name: String = new_lines[0].replace(" ", "").replace("　", "").clone();
+        if let Type::List(l) = self.get_variable_value(name.clone()) {
+            return l[if let Type::Number(i) = self.compute(new_lines[1].clone()) {
+                if let ExecutionMode::Script = self.execution_mode {
+                } else {
+                    println!("{name}のインデックス{i}の値を求めます");
+                }
+                if 0.0 <= i && (i as usize) < l.len() {
+                    i as usize
+                } else {
+                    if let ExecutionMode::Script = self.execution_mode {
+                    } else {
+                        println!("エラー!{i}は{name}のインデックス範囲外です")
+                    };
+                    0
+                }
+            } else {
+                if let ExecutionMode::Script = self.execution_mode {
+                } else {
+                    println!("エラー！インデックスは数値型です");
+                }
+                0
+            }]
+            .clone();
+        } else {
+            return Type::Number(0.0);
+        }
     }
 
     ///　関数を呼び出す
@@ -953,6 +999,17 @@ impl<'a> Executor<'a> {
                     pre.push(format!("var {i} = '{s}'")); // 引数は変数として扱われる
                 }
                 Type::Number(f) => pre.push(format!("var {i} = {f}")),
+                Type::List(l) => pre.push(format!(
+                    "var {i} = [{}]",
+                    l.iter()
+                        .map(|x| match x {
+                            Type::Number(i) => i.to_string(),
+                            Type::String(s) => format!("'{s}'"),
+                            Type::List(_) => "".to_string(),
+                        })
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )),
             }
         }
 
@@ -1076,7 +1133,16 @@ impl<'a> Executor<'a> {
             } else {
                 println!("値を求めます");
             }
-            self.memory[address].value = self.compute(expr.clone());
+            if expr.contains("[") {
+                let expr = expr.replace("[", "").replace("]", "");
+                let mut list: Vec<Type> = Vec::new();
+                for item in expr.split(",") {
+                    list.push(self.compute(item.to_string()))
+                }
+                self.memory[address].value = Type::List(list);
+            } else {
+                self.memory[address].value = self.compute(expr.clone());
+            }
             if let ExecutionMode::Script = self.execution_mode {
             } else {
                 println!("変数{name}のデータを更新しました");
@@ -1087,11 +1153,23 @@ impl<'a> Executor<'a> {
             } else {
                 println!("値を求めます");
             }
-            let value = self.compute(expr.clone());
-            self.memory.push(Variable {
-                name: name.clone(),
-                value: value,
-            });
+            if expr.contains("[") {
+                let expr = expr.replace("[", "").replace("]", "");
+                let mut list: Vec<Type> = Vec::new();
+                for item in expr.split(",") {
+                    list.push(self.compute(item.to_string()))
+                }
+                self.memory.push(Variable {
+                    name: name.clone(),
+                    value: Type::List(list),
+                });
+            } else {
+                let value = self.compute(expr.clone());
+                self.memory.push(Variable {
+                    name: name.clone(),
+                    value: value,
+                });
+            }
             if let ExecutionMode::Script = self.execution_mode {
             } else {
                 println!("メモリに変数を確保しました");
@@ -1146,6 +1224,7 @@ impl<'a> Executor<'a> {
             let mut buffer = String::new();
             let mut in_quotes = false;
             let mut in_brackets = 0;
+            let mut in_parentheses = 0;
 
             for c in expr.chars() {
                 match c {
@@ -1173,7 +1252,15 @@ impl<'a> Executor<'a> {
                         in_brackets -= 1;
                         buffer.push(')');
                     }
-                    ' ' | '　' if !in_quotes && in_brackets == 0 => {
+                    '[' if !in_quotes => {
+                        in_parentheses += 1;
+                        buffer.push('[');
+                    }
+                    ']' if !in_quotes => {
+                        in_parentheses -= 1;
+                        buffer.push(']');
+                    }
+                    ' ' | '　' if !in_quotes && in_brackets == 0 && in_parentheses == 0 => {
                         if !buffer.is_empty() {
                             elements.push(buffer.clone());
                             buffer.clear();
@@ -1188,7 +1275,6 @@ impl<'a> Executor<'a> {
             if !buffer.is_empty() {
                 elements.push(buffer);
             }
-
             elements
         }
 
@@ -1212,6 +1298,17 @@ impl<'a> Executor<'a> {
                         .map(|x| match x {
                             Type::String(s) => format!("'{s}'"),
                             Type::Number(i) => format!("{}", i.to_string()),
+                            Type::List(l) => format!(
+                                "[{}]",
+                                l.iter()
+                                    .map(|x| match x {
+                                        Type::Number(i) => i.to_string(),
+                                        Type::String(s) => format!("'{s}'"),
+                                        Type::List(_) => "".to_string(),
+                                    })
+                                    .collect::<Vec<String>>()
+                                    .join(", ")
+                            ),
                         })
                         .collect::<Vec<String>>()
                         .join(", "),
@@ -1221,6 +1318,11 @@ impl<'a> Executor<'a> {
 
             if item.contains("(") {
                 stack.push(self.call_function(item.to_string()));
+                continue;
+            }
+
+            if item.contains("[") {
+                stack.push(self.get_list_value(item.to_string()));
                 continue;
             }
 
@@ -1386,6 +1488,7 @@ impl<'a> Executor<'a> {
                                                     }
                                                 }
                                             }
+                                            _ => {}
                                         }
                                     }
                                 }
@@ -1399,18 +1502,26 @@ impl<'a> Executor<'a> {
                 }
             }
         }
-        let result = match stack.pop().unwrap_or(Type::Number(0.0)) {
-            Type::String(ref s) => Type::String(s.to_string()),
-            Type::Number(i) => Type::Number(i),
-        };
+        let result = stack.pop().unwrap_or(Type::Number(0.0));
 
         if let ExecutionMode::Script = self.execution_mode {
         } else {
             println!(
                 "結果 = {}",
-                match result {
+                match result.clone() {
                     Type::String(ref s) => format!("'{s}'"),
                     Type::Number(i) => format!("{i}"),
+                    Type::List(l) => format!(
+                        "[{}]",
+                        l.iter()
+                            .map(|x| match x {
+                                Type::Number(i) => i.to_string(),
+                                Type::String(s) => format!("'{s}'"),
+                                Type::List(_) => "".to_string(),
+                            })
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    ),
                 }
             );
         }
