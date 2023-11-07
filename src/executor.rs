@@ -1468,7 +1468,6 @@ impl<'a> Executor<'a> {
                                                     }
                                                 }
                                             }
-
                                             (Type::Number(f1), Type::Number(f2)) => {
                                                 let y = f1;
                                                 let x = f2;
@@ -1516,8 +1515,34 @@ impl<'a> Executor<'a> {
                                                     }
                                                 }
                                             }
-                                            (Type::Number(s1), Type::String(s2)) => {
-                                                let y = s1.to_string();
+                                            (Type::List(l1), Type::List(l2)) => {
+                                                let mut x = l1;
+                                                let mut y = l2;
+                                                match item {
+                                                    "+" => stack.push({
+                                                        x.append(&mut y);
+                                                        Type::List(x.to_owned())
+                                                    }),
+                                                    _ => {
+                                                        stack.push(Type::String(item.to_string()));
+                                                    }
+                                                }
+                                            }
+
+                                            (s1, Type::String(s2)) => {
+                                                let y = match s1 {
+                                                    Type::Number(i) => i.to_string(),
+                                                    Type::List(l) => l
+                                                        .iter()
+                                                        .map(|x| match x {
+                                                            Type::Number(i) => i.to_string(),
+                                                            Type::String(s) => format!("'{s}'"),
+                                                            Type::List(_) => "".to_string(),
+                                                        })
+                                                        .collect::<Vec<String>>()
+                                                        .join(", "),
+                                                    Type::String(s) => s,
+                                                };
                                                 let x = s2;
                                                 match item {
                                                     "+" => stack.push(Type::String(x + &y)),
@@ -1532,9 +1557,21 @@ impl<'a> Executor<'a> {
                                                     }
                                                 }
                                             }
-                                            (Type::String(s1), Type::Number(s2)) => {
+                                            (Type::String(s1), s2) => {
                                                 let y = s1; //型変換
-                                                let x = s2.to_string();
+                                                let x = match s2 {
+                                                    Type::Number(i) => i.to_string(),
+                                                    Type::List(l) => l
+                                                        .iter()
+                                                        .map(|x| match x {
+                                                            Type::Number(i) => i.to_string(),
+                                                            Type::String(s) => format!("'{s}'"),
+                                                            Type::List(_) => "".to_string(),
+                                                        })
+                                                        .collect::<Vec<String>>()
+                                                        .join(", "),
+                                                    Type::String(s) => s,
+                                                };
                                                 match item {
                                                     "+" => stack.push(Type::String(x + &y)),
                                                     "=" => stack.push(Type::Number(if x == y {
