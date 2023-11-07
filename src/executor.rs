@@ -360,11 +360,12 @@ impl<'a> Executor<'a> {
                     let new_code = code.replacen("var", "", 1);
                     let code = &new_code;
                     let params: Vec<&str> = code.split("=").collect();
-                    let name = params[0].trim().replace(" ", "");
+                    let name = params[0].trim();
                     if name.contains("[") {
                         let value = self.compute(params[1..].join("=").to_string());
-                        self.set_list_value(name, value);
+                        self.set_list_value(name.to_string(), value);
                     } else {
+                        let name = name.replace(" ", "");
                         if let ExecutionMode::Script = self.execution_mode {
                         } else {
                             println!("変数{}を定義します", name);
@@ -965,7 +966,7 @@ impl<'a> Executor<'a> {
             .split("[")
             .map(|s| s.to_string())
             .collect();
-        let name: String = new_lines[0].replace(" ", "").replace("　", "").clone();
+        let name: String = new_lines[0].trim().to_string();
         if let Type::List(mut l) = self.get_variable_value(name.clone()) {
             let len = l.len();
             l[if let Type::Number(i) = self.compute(new_lines[1].clone()) {
