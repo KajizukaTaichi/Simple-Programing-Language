@@ -1053,7 +1053,7 @@ impl<'a> Executor<'a> {
                 }
                 Type::Number(f) => pre.push(format!("var {i} = {f}")),
                 Type::List(l) => pre.push(format!(
-                    "var {i} = [{}]",
+                    "var {i} = list[{}]",
                     l.iter()
                         .map(|x| match x {
                             Type::Number(i) => i.to_string(),
