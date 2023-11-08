@@ -1520,8 +1520,8 @@ impl<'a> Executor<'a> {
                                                 let mut y = l2;
                                                 match item {
                                                     "+" => stack.push({
-                                                        x.append(&mut y);
-                                                        Type::List(x.to_owned())
+                                                        y.append(&mut x);
+                                                        Type::List(y.to_owned())
                                                     }),
                                                     _ => {
                                                         stack.push(Type::String(item.to_string()));
