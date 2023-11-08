@@ -444,6 +444,7 @@ impl<'a> Executor<'a> {
                             text += s.replace("'", "").replace('"', "").as_str();
                         }
                         Type::List(l) => {
+                            text += "[";
                             for i in l {
                                 match i {
                                     Type::Number(i) => text += format!("{}, ", i).as_str(),
@@ -451,6 +452,7 @@ impl<'a> Executor<'a> {
                                     _ => {}
                                 }
                             }
+                            text += "]";
                         }
                     }
                     if let ExecutionMode::Script = self.execution_mode {
@@ -585,6 +587,11 @@ impl<'a> Executor<'a> {
                             } else {
                                 println!("関数{}を削除しました", name);
                             }
+                        } else {
+                            if let ExecutionMode::Script = self.execution_mode {
+                            } else {
+                                println!("関数{name}が見つかりません");
+                            }
                         }
                     } else {
                         if name.contains("[") {
@@ -598,7 +605,12 @@ impl<'a> Executor<'a> {
                                         println!("変数{}を削除しました", name);
                                     }
                                 }
-                                None => {}
+                                None => {
+                                    if let ExecutionMode::Script = self.execution_mode {
+                                    } else {
+                                        println!("変数{name}が見つかりません");
+                                    }
+                                }
                             }
                         }
                     }
@@ -911,16 +923,7 @@ impl<'a> Executor<'a> {
     /// 変数の参照
     fn reference_variable(&mut self, name: String) -> Option<usize> {
         let name = name.trim().replace(" ", "").replace("　", "");
-        match self.memory.iter().position(|x| x.name == name) {
-            Some(index) => Some(index),
-            None => {
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("変数{name}が見つかりません");
-                }
-                None
-            }
-        }
+        self.memory.iter().position(|x| x.name == name)
     }
 
     fn get_list_value(&mut self, item: String) -> Type {
@@ -1202,20 +1205,9 @@ impl<'a> Executor<'a> {
             .replace("　", "")
             .replace("(", "")
             .replace(")", "");
-        match self
-            .name_space
+        self.name_space
             .iter()
             .position(|x| x.name == name.trim().replace(" ", ""))
-        {
-            Some(index) => Some(index),
-            None => {
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("関数{name}が見つかりません");
-                }
-                None
-            }
-        }
     }
 
     /// 変数の値をセットする
