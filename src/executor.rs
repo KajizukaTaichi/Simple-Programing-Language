@@ -1313,9 +1313,15 @@ impl<'a> Executor<'a> {
 
     /// 関数を取得する
     fn get_function(&mut self, name: String) -> Option<Function> {
-        let index = match self.reference_function(name) {
+        let index = match self.reference_function(name.clone()) {
             Some(i) => i,
-            None => return None,
+            None => {
+                if let ExecutionMode::Script = self.execution_mode {
+                } else {
+                    println!("関数{}が見つかりません", &name);
+                }
+                return None;
+            }
         };
         return Some(self.name_space[index].clone());
     }
