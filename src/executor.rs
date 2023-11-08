@@ -907,7 +907,16 @@ impl<'a> Executor<'a> {
     /// 変数の参照
     fn reference_variable(&mut self, name: String) -> Option<usize> {
         let name = name.trim().replace(" ", "").replace("　", "");
-        self.memory.iter().position(|x| x.name == name)
+        match self.memory.iter().position(|x| x.name == name) {
+            Some(index) => Some(index),
+            None => {
+                if let ExecutionMode::Script = self.execution_mode {
+                } else {
+                    println!("変数{name}が見つかりません");
+                }
+                None
+            }
+        }
     }
 
     fn get_list_value(&mut self, item: String) -> Type {
