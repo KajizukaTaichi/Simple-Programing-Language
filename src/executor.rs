@@ -587,15 +587,19 @@ impl<'a> Executor<'a> {
                             }
                         }
                     } else {
-                        match self.reference_variable(name.clone()) {
-                            Some(index) => {
-                                self.memory.remove(index);
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("変数{}を削除しました", name);
+                        if name.contains("[") {
+                            self.del_list_value(name.to_string());
+                        } else {
+                            match self.reference_variable(name.clone()) {
+                                Some(index) => {
+                                    self.memory.remove(index);
+                                    if let ExecutionMode::Script = self.execution_mode {
+                                    } else {
+                                        println!("変数{}を削除しました", name);
+                                    }
                                 }
+                                None => {}
                             }
-                            None => {}
                         }
                     }
                 } else if code.contains("rand") {
@@ -1001,6 +1005,46 @@ impl<'a> Executor<'a> {
                 }
                 0
             }] = value;
+            let address = self.reference_variable(name.clone()).unwrap_or(0);
+            self.memory[address].value = Type::List(l);
+        }
+    }
+
+    fn del_list_value(&mut self, item: String) {
+        let new_lines: Vec<String> = item
+            .trim()
+            .replace("]", "")
+            .split("[")
+            .map(|s| s.to_string())
+            .collect();
+        let name: String = new_lines[0].trim().to_string();
+        if let Type::List(mut l) = self.get_variable_value(name.clone()) {
+            let len = l.len();
+            l.remove(
+                if let Type::Number(i) = self.compute(new_lines[1].clone()) {
+                    let j = (i - 1.0) as usize;
+                    if let ExecutionMode::Script = self.execution_mode {
+                    } else {
+                        println!("{name}のインデックス{i}の値を削除します");
+                    }
+                    if j < len {
+                        j
+                    } else {
+                        if let ExecutionMode::Script = self.execution_mode {
+                        } else {
+                            println!("エラー!{i}は{name}のインデックス範囲外です");
+                            return;
+                        };
+                        0
+                    }
+                } else {
+                    if let ExecutionMode::Script = self.execution_mode {
+                    } else {
+                        println!("エラー！インデックスは数値型です");
+                    }
+                    return;
+                },
+            );
             let address = self.reference_variable(name.clone()).unwrap_or(0);
             self.memory[address].value = Type::List(l);
         }
