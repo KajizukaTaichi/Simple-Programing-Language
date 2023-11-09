@@ -749,8 +749,17 @@ impl<'a> Executor<'a> {
     }
 
     /// 構文チェック
-    pub fn check(&mut self, code: Vec<String>) -> bool {
+    pub fn check(&mut self, code: Vec<String>) {
         for code in code {
+            let code = if let ControlMode::Function = self.control_mode {
+                code.as_str()
+            } else {
+                code.trim().split("#").collect::<Vec<&str>>()[0]
+            };
+            if code == "" {
+                continue;
+            }
+
             match self.control_mode {
                 ControlMode::For => {
                     if code.contains("end for") {
@@ -789,13 +798,12 @@ impl<'a> Executor<'a> {
                         } else {
                             self.control_mode = ControlMode::Normal;
                             if let Type::Number(i) = self.compute(self.expr.clone()) {
-                                if Executor::new(
+                                Executor::new(
                                     &mut self.memory,
                                     &mut self.name_space,
                                     self.execution_mode.clone(),
                                 )
-                                .check(self.stmt.clone())
-                                {}
+                                .check(self.stmt.clone());
                                 if i == 0.0 {
                                     self.stmt = Vec::new();
                                 } else {
@@ -820,24 +828,22 @@ impl<'a> Executor<'a> {
                             self.control_mode = ControlMode::Normal;
                             if let Type::Number(i) = self.compute(self.expr.clone()) {
                                 if i == 0.0 {
-                                    if Executor::new(
+                                    Executor::new(
                                         &mut self.memory,
                                         &mut self.name_space,
                                         self.execution_mode.clone(),
                                     )
-                                    .check(self.else_stmt.clone())
-                                    {
-                                    }
+                                    .check(self.else_stmt.clone());
+
                                     self.else_stmt = Vec::new();
                                     self.stmt = Vec::new();
                                 } else {
-                                    if Executor::new(
+                                    Executor::new(
                                         &mut self.memory,
                                         &mut self.name_space,
                                         self.execution_mode.clone(),
                                     )
-                                    .check(self.stmt.clone())
-                                    {}
+                                    .check(self.stmt.clone());
                                     self.else_stmt = Vec::new();
                                     self.stmt = Vec::new();
                                 }
@@ -857,13 +863,12 @@ impl<'a> Executor<'a> {
                             self.stmt.push(code.to_string());
                         } else {
                             self.control_mode = ControlMode::Normal;
-                            if Executor::new(
+                            Executor::new(
                                 &mut self.memory,
                                 &mut self.name_space,
                                 self.execution_mode.clone(),
                             )
-                            .check(self.stmt.clone())
-                            {};
+                            .check(self.stmt.clone());
                         }
                     } else if code.contains("while") {
                         self.nest_while += 1;
@@ -880,13 +885,12 @@ impl<'a> Executor<'a> {
                             self.stmt.push(code.to_string());
                         } else {
                             self.control_mode = ControlMode::Normal;
-                            if Executor::new(
+                            Executor::new(
                                 &mut self.memory,
                                 &mut self.name_space,
                                 self.execution_mode.clone(),
                             )
-                            .check(self.stmt.clone())
-                            {};
+                            .check(self.stmt.clone());
                             self.stmt = Vec::new();
                         }
                     } else if code.contains("func") {
@@ -916,12 +920,6 @@ impl<'a> Executor<'a> {
                             println!("エラー! 関数にはカッコをつけてください");
                         }
                     } else if code.contains("for") {
-                        let new_code = code.replacen("for", "", 1);
-                        if let Type::Number(i) = self.compute(new_code) {
-                            self.count = i.round() as usize // ループ回数
-                        } else {
-                            println!("エラー! ループ回数は数値型です");
-                        }
                         self.control_mode = ControlMode::For;
                     } else if code.contains("if") {
                         self.expr = code.replacen("if", "", 1);
@@ -960,7 +958,6 @@ impl<'a> Executor<'a> {
             }
             ControlMode::Normal => {}
         };
-        return false;
     }
 
     /// スクリプトを実行する

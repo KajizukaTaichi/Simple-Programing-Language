@@ -40,6 +40,7 @@ fn main() {
                 } else if args[1] == "check" || args[1] == "c" {
                     println!("{}の構文チェックをします", args[2]);
                     executor.check(code.split("\n").map(|x| x.to_string()).collect());
+                    println!("完了しました");
                 } else {
                     println!("実行モードを正しく指定してください")
                 }
