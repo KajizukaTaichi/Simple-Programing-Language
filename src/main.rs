@@ -28,15 +28,18 @@ fn main() {
         //ファイルが環境変数にあるか?
         match get_file_contents(args[2].to_string()) {
             Ok(code) => {
+                println!("{message}");
                 if args[1] == "run" || args[1] == "r" {
-                    println!("{message}");
+                    println!("{}を実行します", args[2]);
                     executor.script(&code);
                 } else if args[1] == "debug" || args[1] == "d" {
                     println!("{}をデバッグします", args[2]);
                     executor.debugger(&code);
                 } else if args[1] == "interactive" || args[1] == "i" {
-                    println!("{message}");
                     executor.interactive();
+                } else if args[1] == "check" || args[1] == "c" {
+                    println!("{}の構文チェックをします", args[2]);
+                    executor.check(code.split("\n").map(|x| x.to_string()).collect());
                 } else {
                     println!("実行モードを正しく指定してください")
                 }

@@ -407,7 +407,7 @@ impl<'a> Executor<'a> {
                     self.count = if let Type::Number(i) = self.compute(new_code) {
                         i.round() as usize // ループ回数
                     } else {
-                        println!("エラー！ループ回数は数値型です");
+                        println!("エラー! ループ回数は数値型です");
                         1
                     };
                     self.control_mode = ControlMode::For;
@@ -634,7 +634,7 @@ impl<'a> Executor<'a> {
                             }) {
                                 i.round() as i64
                             } else {
-                                println!("エラー！文字列型変数は使えません");
+                                println!("エラー! 文字列型変数は使えません");
                                 0
                             },
                             if let Type::Number(i) = self.compute({
@@ -646,7 +646,7 @@ impl<'a> Executor<'a> {
                             }) {
                                 i.round() as i64
                             } else {
-                                println!("エラー！文字列型変数は使えません");
+                                println!("エラー! 文字列型変数は使えません");
                                 1
                             },
                         );
@@ -680,7 +680,7 @@ impl<'a> Executor<'a> {
                     } else {
                         println!("プロセスを終了します");
                     }
-                    exit(0);
+                    exit(0)
                 } else {
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
@@ -748,10 +748,226 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// 構文チェック
+    pub fn check(&mut self, code: Vec<String>) -> bool {
+        for code in code {
+            match self.control_mode {
+                ControlMode::For => {
+                    if code.contains("end for") {
+                        // ネストの階層を判別する
+                        if self.nest_for > 0 {
+                            self.nest_for -= 1;
+                            self.stmt.push(code.to_string());
+                        } else {
+                            self.control_mode = ControlMode::Normal;
+                            Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .check(self.stmt.clone());
+                            self.stmt = Vec::new();
+                        }
+                    } else if code.contains("for") {
+                        // ネストの階層を上げる
+                        self.nest_for += 1;
+                        self.stmt.push(code.to_string());
+                    } else {
+                        // コードを追加する
+                        self.stmt.push(code.to_string());
+                    }
+                }
+
+                ControlMode::If => {
+                    if code.contains("else") {
+                        // モードをelseに変える
+                        self.control_mode = ControlMode::Else
+                    } else if code.contains("end if") {
+                        if self.nest_if > 0 {
+                            self.nest_if -= 1;
+                            self.stmt.push(code.to_string());
+                        } else {
+                            self.control_mode = ControlMode::Normal;
+                            if let Type::Number(i) = self.compute(self.expr.clone()) {
+                                if Executor::new(
+                                    &mut self.memory,
+                                    &mut self.name_space,
+                                    self.execution_mode.clone(),
+                                )
+                                .check(self.stmt.clone())
+                                {}
+                                if i == 0.0 {
+                                    self.stmt = Vec::new();
+                                } else {
+                                    self.stmt = Vec::new();
+                                }
+                            }
+                        }
+                    } else if code.contains("if") {
+                        self.nest_if += 1;
+                        self.stmt.push(code.to_string());
+                    } else {
+                        self.stmt.push(code.to_string());
+                    }
+                }
+
+                ControlMode::Else => {
+                    if code.contains("end if") {
+                        if self.nest_if > 0 {
+                            self.nest_if -= 1;
+                            self.else_stmt.push(code.to_string());
+                        } else {
+                            self.control_mode = ControlMode::Normal;
+                            if let Type::Number(i) = self.compute(self.expr.clone()) {
+                                if i == 0.0 {
+                                    if Executor::new(
+                                        &mut self.memory,
+                                        &mut self.name_space,
+                                        self.execution_mode.clone(),
+                                    )
+                                    .check(self.else_stmt.clone())
+                                    {
+                                    }
+                                    self.else_stmt = Vec::new();
+                                    self.stmt = Vec::new();
+                                } else {
+                                    if Executor::new(
+                                        &mut self.memory,
+                                        &mut self.name_space,
+                                        self.execution_mode.clone(),
+                                    )
+                                    .check(self.stmt.clone())
+                                    {}
+                                    self.else_stmt = Vec::new();
+                                    self.stmt = Vec::new();
+                                }
+                            }
+                        }
+                    } else if code.contains("if") {
+                        self.nest_if += 1;
+                        self.else_stmt.push(code.to_string());
+                    } else {
+                        self.else_stmt.push(code.to_string());
+                    }
+                }
+                ControlMode::While => {
+                    if code.contains("end while") {
+                        if self.nest_while > 0 {
+                            self.nest_while -= 1;
+                            self.stmt.push(code.to_string());
+                        } else {
+                            self.control_mode = ControlMode::Normal;
+                            if Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .check(self.stmt.clone())
+                            {};
+                        }
+                    } else if code.contains("while") {
+                        self.nest_while += 1;
+                        self.stmt.push(code.to_string());
+                    } else {
+                        self.stmt.push(code.to_string());
+                    }
+                }
+
+                ControlMode::Function => {
+                    if code.contains("end func") {
+                        if self.nest_func > 0 {
+                            self.nest_func -= 1;
+                            self.stmt.push(code.to_string());
+                        } else {
+                            self.control_mode = ControlMode::Normal;
+                            if Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .check(self.stmt.clone())
+                            {};
+                            self.stmt = Vec::new();
+                        }
+                    } else if code.contains("func") {
+                        self.nest_func += 1;
+                        self.stmt.push(code.to_string());
+                    } else {
+                        self.stmt.push(code.to_string());
+                    }
+                }
+
+                ControlMode::Normal => {
+                    if code.contains("var") {
+                        // 変数の定義
+                        let new_code = code.replacen("var", "", 1);
+                        if !&new_code.contains("=") {
+                            println!("エラー! 変数名と式の間にイコールをいれてください");
+                        }
+                    } else if code.contains("func") {
+                        //　関数の定義
+                        if !code.contains("(") {
+                            println!("エラー! 関数にはカッコをつけてください");
+                        }
+                        self.control_mode = ControlMode::Function;
+                    } else if code.contains("call") {
+                        // 関数呼び出し
+                        if !code.contains("(") {
+                            println!("エラー! 関数にはカッコをつけてください");
+                        }
+                    } else if code.contains("for") {
+                        let new_code = code.replacen("for", "", 1);
+                        if let Type::Number(i) = self.compute(new_code) {
+                            self.count = i.round() as usize // ループ回数
+                        } else {
+                            println!("エラー! ループ回数は数値型です");
+                        }
+                        self.control_mode = ControlMode::For;
+                    } else if code.contains("if") {
+                        self.expr = code.replacen("if", "", 1);
+                        self.control_mode = ControlMode::If
+                    } else if code.contains("while") {
+                        self.expr = code.replacen("while", "", 1);
+                        self.control_mode = ControlMode::While;
+                    } else if code.contains("rand") {
+                        // 乱数
+                        let new_code = code.replacen("rand", "", 1);
+                        let params = new_code.split(",").collect::<Vec<&str>>();
+                        if params.len() < 3 {
+                            println!("エラー! rand分には3つに引数が必要です");
+                        }
+                    } else {
+                        if let ExecutionMode::Script = self.execution_mode {
+                        } else {
+                            println!("エラー! コマンドが不正です: {}", code);
+                        }
+                    }
+                }
+            }
+        }
+        match self.control_mode {
+            ControlMode::Function => {
+                println!("エラー! 関数の終わりが見つかりません");
+            }
+            ControlMode::If | ControlMode::Else => {
+                println!("エラー! if文の終わりが見つかりません");
+            }
+            ControlMode::For => {
+                println!("エラー! for文の終わりが見つかりません");
+            }
+            ControlMode::While => {
+                println!("エラー! while文の終わりが見つかりません");
+            }
+            ControlMode::Normal => {}
+        };
+        return false;
+    }
+
     /// スクリプトを実行する
     pub fn script(&mut self, code: &String) -> Option<Type> {
         self.execution_mode = ExecutionMode::Script;
-        return self.execute_block(code.split("\n").map(|x| x.to_string()).collect());
+        let code: Vec<String> = code.split("\n").map(|x| x.to_string()).collect();
+        self.execute_block(code)
     }
 
     /// ファイルをデバッグする
@@ -912,7 +1128,7 @@ impl<'a> Executor<'a> {
                 }
             } else if menu.contains("exit") {
                 input("デバッグを中断します");
-                exit(0);
+                exit(0)
             } else {
                 println!("継続します");
                 break;
@@ -946,7 +1162,7 @@ impl<'a> Executor<'a> {
                 } else {
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
-                        println!("エラー!{i}は{name}のインデックス範囲外です");
+                        println!("エラー! {i}は{name}のインデックス範囲外です");
                     };
                     return Type::Number(0.0);
                 }
@@ -965,7 +1181,7 @@ impl<'a> Executor<'a> {
 
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
-                    println!("エラー！インデックスは数値型です");
+                    println!("エラー! インデックスは数値型です");
                 }
                 return Type::Number(0.0);
             };
@@ -996,7 +1212,7 @@ impl<'a> Executor<'a> {
                 } else {
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
-                        println!("エラー!{i}は{name}のインデックス範囲外です");
+                        println!("エラー! {i}は{name}のインデックス範囲外です");
                         return;
                     };
                     0
@@ -1004,7 +1220,7 @@ impl<'a> Executor<'a> {
             } else {
                 if let ExecutionMode::Script = self.execution_mode {
                 } else {
-                    println!("エラー！インデックスは数値型です");
+                    println!("エラー! インデックスは数値型です");
                 }
                 0
             }] = value;
@@ -1035,7 +1251,7 @@ impl<'a> Executor<'a> {
                     } else {
                         if let ExecutionMode::Script = self.execution_mode {
                         } else {
-                            println!("エラー!{i}は{name}のインデックス範囲外です");
+                            println!("エラー! {i}は{name}のインデックス範囲外です");
                             return;
                         };
                         0
@@ -1043,7 +1259,7 @@ impl<'a> Executor<'a> {
                 } else {
                     if let ExecutionMode::Script = self.execution_mode {
                     } else {
-                        println!("エラー！インデックスは数値型です");
+                        println!("エラー! インデックスは数値型です");
                     }
                     return;
                 },
@@ -1338,21 +1554,13 @@ impl<'a> Executor<'a> {
 
             for c in expr.chars() {
                 match c {
-                    '"' if !in_quotes => {
+                    '"' | '\'' if !in_quotes => {
                         in_quotes = true;
                         buffer.push('"');
                     }
-                    '\'' if !in_quotes => {
-                        in_quotes = true;
-                        buffer.push('\'');
-                    }
-                    '"' if in_quotes => {
+                    '"' | '\'' if in_quotes => {
                         in_quotes = false;
                         buffer.push('"');
-                    }
-                    '\'' if in_quotes => {
-                        in_quotes = false;
-                        buffer.push('\'');
                     }
                     '(' if !in_quotes => {
                         in_brackets += 1;
@@ -1481,7 +1689,7 @@ impl<'a> Executor<'a> {
                                                 println!("ポインタがさす値を求めます");
                                             }
                                             if y.round() as usize > &self.memory.len() - 1 {
-                                                println!("エラー!アドレスが不正です");
+                                                println!("エラー! アドレスが不正です");
                                                 Type::Number(0.0)
                                             } else {
                                                 self.memory[y.round() as usize].value.clone()
