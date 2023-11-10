@@ -1590,6 +1590,7 @@ impl<'a> Executor<'a> {
             }
             if let ExecutionMode::Script = self.execution_mode {
             } else {
+                // スタック内部を表示
                 println!(
                     "| Stack: [{}]  ←  {}",
                     stack
@@ -1613,6 +1614,53 @@ impl<'a> Executor<'a> {
                         .join(", "),
                     item
                 );
+            }
+
+            // 文字列に変換
+            if item.contains("(") && item.contains("string") {
+                stack.push(Type::String(
+                    match self.compute(
+                        item[..item.len() - 1].split("(").collect::<Vec<&str>>()[1..]
+                            .join("(")
+                            .to_string(),
+                    ) {
+                        Type::Number(i) => i.to_string(),
+                        Type::List(l) => l
+                            .iter()
+                            .map(|x| match x {
+                                Type::Number(i) => i.to_string(),
+                                Type::String(s) => format!("'{s}'"),
+                                Type::List(_) => "".to_string(),
+                            })
+                            .collect::<Vec<String>>()
+                            .join(", "),
+                        Type::String(s) => s,
+                    },
+                ));
+                continue;
+            }
+
+            // 数値に変換
+            if item.contains("(") && item.contains("number") {
+                stack.push(Type::Number(
+                    match self.compute(
+                        item[..item.len() - 1].split("(").collect::<Vec<&str>>()[1..]
+                            .join("(")
+                            .to_string(),
+                    ) {
+                        Type::Number(i) => i,
+                        Type::List(l) => match &l[0] {
+                            Type::Number(i) => *i,
+                            Type::String(ls) => ls.parse().unwrap_or(0.0),
+                            _ => 0.0,
+                        },
+                        Type::String(s) => s.parse().unwrap_or({
+                            println!("エラー! 変換できませんでした");
+                            0.0
+                        }),
+                    },
+                ));
+                continue;
             }
 
             if item.contains("(") {
@@ -1659,9 +1707,7 @@ impl<'a> Executor<'a> {
                             };
 
                             match (y.clone(), x.clone()) {
-                                (Type::String(s1), Type::String(s2)) => {
-                                    let y = s1;
-                                    let x = s2;
+                                (Type::String(y), Type::String(x)) => {
                                     match item {
                                         "+" => stack.push(Type::String(x + &y)),
                                         "=" => {
@@ -1675,9 +1721,7 @@ impl<'a> Executor<'a> {
                                         }
                                     }
                                 }
-                                (Type::Number(f1), Type::Number(f2)) => {
-                                    let y = f1;
-                                    let x = f2;
+                                (Type::Number(y), Type::Number(x)) => {
                                     match item {
                                         "+" => stack.push(Type::Number(x + y)),
                                         "-" => stack.push(Type::Number(x - y)),
@@ -1706,6 +1750,32 @@ impl<'a> Executor<'a> {
                                         "<" => {
                                             stack.push(Type::Number(if x < y { 1.0 } else { 0.0 }))
                                         }
+                                        "!" => {
+                                            stack.push(Type::Number(x));
+                                            stack.push(Type::Number(if y == 0.0 {
+                                                1.0
+                                            } else {
+                                                0.0
+                                            }));
+                                            continue;
+                                        }
+                                        "~" => {
+                                            stack.push(Type::Number(x));
+                    
+                                            stack.push({
+                                                if let ExecutionMode::Script = self.execution_mode {
+                                                } else {
+                                                    println!("ポインタがさす値を求めます");
+                                                }
+                                                if y.round() as usize > &self.memory.len() - 1 {
+                                                    println!("エラー! アドレスが不正です");
+                                                    Type::Number(0.0)
+                                                } else {
+                                                    self.memory[y.round() as usize].value.clone()
+                                                }
+                                            });
+                                            continue;
+                                        }
                                         _ => {
                                             stack.push(Type::Number(x));
                                             stack.push(Type::Number(y));
@@ -1714,9 +1784,7 @@ impl<'a> Executor<'a> {
                                         }
                                     }
                                 }
-                                (Type::List(l1), Type::List(l2)) => {
-                                    let mut y = l1;
-                                    let mut x = l2;
+                                (Type::List(mut y), Type::List(mut x)) => {
                                     match item {
                                         "+" => {
                                             x.append(&mut y);
@@ -1730,93 +1798,32 @@ impl<'a> Executor<'a> {
                                         }
                                     }
                                 }
-
-                                (s1, Type::String(s2)) => {
-                                    let y = match s1.clone() {
-                                        Type::Number(i) => i.to_string(),
-                                        Type::List(l) => l
-                                            .iter()
-                                            .map(|x| match x {
-                                                Type::Number(i) => i.to_string(),
-                                                Type::String(s) => format!("'{s}'"),
-                                                Type::List(_) => "".to_string(),
-                                            })
-                                            .collect::<Vec<String>>()
-                                            .join(", "),
-                                        Type::String(s) => s,
-                                    };
-                                    let x = s2;
-                                    match item {
-                                        "+" => stack.push(Type::String(x + &y)),
-                                        "=" => {
-                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
-                                        }
-                                        _ => {
-                                            stack.push(s1);
-                                            stack.push(Type::String(y));
-                                            // 文字列として処理する
-                                            stack.push(Type::String(item.to_string()));
-                                        }
-                                    }
+                                _ => {
+                                    println!("エラー!型が一致しません")
                                 }
-                                (Type::String(s1), s2) => {
-                                    let y = s1; //型変換
-                                    let x = match s2.clone() {
-                                        Type::Number(i) => i.to_string(),
-                                        Type::List(l) => l
-                                            .iter()
-                                            .map(|x| match x {
-                                                Type::Number(i) => i.to_string(),
-                                                Type::String(s) => format!("'{s}'"),
-                                                Type::List(_) => "".to_string(),
-                                            })
-                                            .collect::<Vec<String>>()
-                                            .join(", "),
-                                        Type::String(s) => s,
-                                    };
-                                    match item {
-                                        "+" => stack.push(Type::String(x + &y)),
-                                        "=" => {
-                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
-                                        }
-                                        _ => {
-                                            stack.push(Type::String(x));
-                                            stack.push(s2);
-                                            // 文字列として処理する
-                                            stack.push(Type::String(item.to_string()));
-                                        }
-                                    }
-                                }
-                                _ => {}
                             }
                         } else if stack.len() == 1 {
                             // オペランドが一つの演算子
                             match item {
                                 "!" => {
-                                    let y;
-                                    match stack.pop() {
-                                        Some(i) => {
-                                            y = match i {
-                                                Type::Number(i) => i,
-                                                _ => 0.0,
-                                            }
+                                    let y = match stack.pop().unwrap() {
+                                        Type::Number(i) => i,
+                                        _ => {
+                                            println!("型が一致しません");
+                                            0.0
                                         }
-                                        None => continue,
-                                    }
+                                    };
                                     stack.push(Type::Number(if y == 0.0 { 1.0 } else { 0.0 }));
                                     continue;
                                 }
                                 "~" => {
-                                    let y;
-                                    match stack.pop() {
-                                        Some(i) => {
-                                            y = match i {
-                                                Type::Number(i) => i,
-                                                _ => 0.0,
-                                            }
+                                    let y = match stack.pop().unwrap() {
+                                        Type::Number(i) => i,
+                                        _ => {
+                                            println!("型が一致しません");
+                                            0.0
                                         }
-                                        None => continue,
-                                    }
+                                    };
 
                                     stack.push({
                                         if let ExecutionMode::Script = self.execution_mode {
@@ -1832,6 +1839,7 @@ impl<'a> Executor<'a> {
                                     });
                                     continue;
                                 }
+
                                 _ => {
                                     // 文字列として処理する
                                     stack.push(Type::String(item.to_string()));
