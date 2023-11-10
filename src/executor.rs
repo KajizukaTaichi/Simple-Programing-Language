@@ -1272,26 +1272,80 @@ impl<'a> Executor<'a> {
             println!("エラー! 関数にはカッコをつけてください");
             return Type::Number(0.0);
         }
-        let new_lines: Vec<String> = item
-            .trim()
-            .replacen("call", "", 1)
-            .replace(")", "")
-            .split("(")
-            .map(|s| s.to_string())
-            .collect();
-        let func_name: String = new_lines[0].replace(" ", "").replace("　", "").clone();
+        let params: Vec<&str> = item[..item.len() - 1].split("(").collect::<Vec<&str>>();
+
+        let func_name: String = params[0].replace(" ", "").replace("　", "").clone();
 
         if let ExecutionMode::Script = self.execution_mode {
         } else {
             println!("引数の値を求めます");
         }
 
-        let args_value: Vec<Type> = new_lines[1]
-            .split(',')
-            .map(|s| self.compute(s.to_string()))
-            .collect();
+        fn tokenize_expression(expr: &str) -> Vec<String> {
+            let mut elements = Vec::new();
+            let mut buffer = String::new();
+            let mut in_quotes = false;
+            let mut in_brackets = 0;
+            let mut in_parentheses = 0;
+
+            for c in expr.chars() {
+                match c {
+                    '"' | '\'' if !in_quotes => {
+                        in_quotes = true;
+                        buffer.push('"');
+                    }
+                    '"' | '\'' if in_quotes => {
+                        in_quotes = false;
+                        buffer.push('"');
+                    }
+                    '(' if !in_quotes => {
+                        in_brackets += 1;
+                        buffer.push('(');
+                    }
+                    ')' if !in_quotes => {
+                        in_brackets -= 1;
+                        buffer.push(')');
+                    }
+                    '[' if !in_quotes => {
+                        in_parentheses += 1;
+                        buffer.push('[');
+                    }
+                    ']' if !in_quotes => {
+                        in_parentheses -= 1;
+                        buffer.push(']');
+                    }
+                    ',' if !in_quotes && in_brackets == 0 && in_parentheses == 0 => {
+                        if !buffer.is_empty() {
+                            elements.push(buffer.clone());
+                            buffer.clear();
+                        }
+                    }
+                    _ => {
+                        buffer.push(c);
+                    }
+                }
+            }
+
+            if !buffer.is_empty() {
+                elements.push(buffer);
+            }
+            elements
+        }
+
+        let args_value: Vec<Type> = tokenize_expression(
+            params[1..]
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join("(")
+                .as_str(),
+        )
+        .iter()
+        .map(|s| self.compute(s.to_string()))
+        .collect();
 
         let name = func_name
+            .replacen("call", "", 1)
             .replace(" ", "")
             .replace("　", "")
             .replace("(", "")
@@ -1761,7 +1815,7 @@ impl<'a> Executor<'a> {
                                         }
                                         "~" => {
                                             stack.push(Type::Number(x));
-                    
+
                                             stack.push({
                                                 if let ExecutionMode::Script = self.execution_mode {
                                                 } else {
