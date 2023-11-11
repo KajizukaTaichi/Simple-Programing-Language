@@ -537,7 +537,12 @@ impl<'a> Executor<'a> {
                                     println!("]");
                                 }
                                 Type::Bool(b) => {
-                                    println!("{}", &b.to_string());
+                                    println!(
+                                        "| [{:>3}] {:<name_max_len$} : {}",
+                                        index,
+                                        vars.name,
+                                        &b.to_string()
+                                    );
                                 }
                             }
                         }
@@ -1086,7 +1091,12 @@ impl<'a> Executor<'a> {
                                 println!("]");
                             }
                             Type::Bool(b) => {
-                                println!("{}", &b.to_string());
+                                println!(
+                                    "| [{:>3}] {:<name_max_len$} : {}",
+                                    index,
+                                    vars.name,
+                                    &b.to_string()
+                                );
                             }
                         }
                     }
