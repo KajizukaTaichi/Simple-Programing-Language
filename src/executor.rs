@@ -16,6 +16,7 @@ pub enum Type {
     Number(f64),
     String(String),
     List(Vec<Type>),
+    Bool(bool),
 }
 
 /// 変数のデータ
@@ -169,36 +170,34 @@ impl<'a> Executor<'a> {
                         } else {
                             println!("ifの条件式を評価します");
                         }
-                        if let Type::Number(i) = self.compute(self.expr.clone()) {
-                            if i == 0.0 {
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("条件が一致しなかったので、実行しません");
-                                }
-                                self.stmt = Vec::new();
+                        if let Type::Bool(true) = self.compute(self.expr.clone()) {
+                            if let ExecutionMode::Script = self.execution_mode {
                             } else {
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("条件が一致したので、実行します");
-                                }
-
-                                let status = Executor::new(
-                                    &mut self.memory,
-                                    &mut self.name_space,
-                                    self.execution_mode.clone(),
-                                )
-                                .execute_block(self.stmt.clone());
-                                match status {
-                                    Some(j) => {
-                                        // 戻り値を返す
-                                        return Some(j);
-                                    }
-                                    None => {}
-                                }
-                                self.stmt = Vec::new();
+                                println!("条件が一致したので、実行します");
                             }
-                            self.control_mode = ControlMode::Normal;
+
+                            let status = Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .execute_block(self.stmt.clone());
+                            match status {
+                                Some(j) => {
+                                    // 戻り値を返す
+                                    return Some(j);
+                                }
+                                None => {}
+                            }
+                            self.stmt = Vec::new();
+                        } else {
+                            if let ExecutionMode::Script = self.execution_mode {
+                            } else {
+                                println!("条件が一致しなかったので、実行しません");
+                            }
+                            self.stmt = Vec::new();
                         }
+                        self.control_mode = ControlMode::Normal;
                     }
                 } else if code.contains("if") {
                     self.nest_if += 1;
@@ -218,50 +217,48 @@ impl<'a> Executor<'a> {
                         } else {
                             println!("ifの条件式を評価します");
                         }
-                        if let Type::Number(i) = self.compute(self.expr.clone()) {
-                            if i == 0.0 {
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("条件が一致しなかったので、elseのコードを実行します");
-                                }
-
-                                let status = Executor::new(
-                                    &mut self.memory,
-                                    &mut self.name_space,
-                                    self.execution_mode.clone(),
-                                )
-                                .execute_block(self.else_stmt.clone());
-                                match status {
-                                    Some(j) => {
-                                        // 戻り値を返す
-                                        return Some(j);
-                                    }
-                                    None => {}
-                                }
-                                self.else_stmt = Vec::new();
-                                self.stmt = Vec::new();
+                        if let Type::Bool(true) = self.compute(self.expr.clone()) {
+                            if let ExecutionMode::Script = self.execution_mode {
                             } else {
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("条件が一致したので、実行します");
-                                }
-
-                                let status = Executor::new(
-                                    &mut self.memory,
-                                    &mut self.name_space,
-                                    self.execution_mode.clone(),
-                                )
-                                .execute_block(self.stmt.clone());
-                                match status {
-                                    Some(j) => {
-                                        // 戻り値を返す
-                                        return Some(j);
-                                    }
-                                    None => {}
-                                }
-                                self.else_stmt = Vec::new();
-                                self.stmt = Vec::new();
+                                println!("条件が一致したので、実行します");
                             }
+
+                            let status = Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .execute_block(self.stmt.clone());
+                            match status {
+                                Some(j) => {
+                                    // 戻り値を返す
+                                    return Some(j);
+                                }
+                                None => {}
+                            }
+                            self.else_stmt = Vec::new();
+                            self.stmt = Vec::new();
+                        } else {
+                            if let ExecutionMode::Script = self.execution_mode {
+                            } else {
+                                println!("条件が一致しなかったので、elseのコードを実行します");
+                            }
+
+                            let status = Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .execute_block(self.else_stmt.clone());
+                            match status {
+                                Some(j) => {
+                                    // 戻り値を返す
+                                    return Some(j);
+                                }
+                                None => {}
+                            }
+                            self.else_stmt = Vec::new();
+                            self.stmt = Vec::new();
                         }
                         self.control_mode = ControlMode::Normal;
                     }
@@ -283,50 +280,48 @@ impl<'a> Executor<'a> {
                             } else {
                                 println!("whileの条件式を評価します");
                             }
-                            if let Type::Number(i) = self.compute(self.expr.clone()) {
-                                if i == 0.0 {
-                                    self.stmt = Vec::new();
-                                    if let ExecutionMode::Script = self.execution_mode {
-                                    } else {
-                                        println!("条件が一致しなかったので、ループを脱出します");
-                                    }
-                                    break;
+                            if let Type::Bool(true) = self.compute(self.expr.clone()) {
+                                if let ExecutionMode::Script = self.execution_mode {
                                 } else {
-                                    if let ExecutionMode::Script = self.execution_mode {
-                                    } else {
-                                        println!("条件が一致したので、ループを継続します");
-                                    }
-                                    if let ExecutionMode::Interactive = self.execution_mode {
-                                        self.execution_mode = ExecutionMode::Debug
-                                    }
-                                    let status = Executor::new(
-                                        &mut self.memory,
-                                        &mut self.name_space,
-                                        self.execution_mode.clone(),
-                                    )
-                                    .execute_block(self.stmt.clone());
-                                    match status {
-                                        Some(j) => {
-                                            if let Type::Number(k) = j {
-                                                if k == f64::MAX {
-                                                    //状態がbreakの時はループを抜け出す
-                                                    break;
-                                                } else if k == f64::MIN {
-                                                    continue;
-                                                } else {
-                                                    return Some(j);
-                                                }
+                                    println!("条件が一致したので、ループを継続します");
+                                }
+                                if let ExecutionMode::Interactive = self.execution_mode {
+                                    self.execution_mode = ExecutionMode::Debug
+                                }
+                                let status = Executor::new(
+                                    &mut self.memory,
+                                    &mut self.name_space,
+                                    self.execution_mode.clone(),
+                                )
+                                .execute_block(self.stmt.clone());
+                                match status {
+                                    Some(j) => {
+                                        if let Type::Number(k) = j {
+                                            if k == f64::MAX {
+                                                //状態がbreakの時はループを抜け出す
+                                                break;
+                                            } else if k == f64::MIN {
+                                                continue;
                                             } else {
-                                                // 戻り値を返す
                                                 return Some(j);
                                             }
+                                        } else {
+                                            // 戻り値を返す
+                                            return Some(j);
                                         }
-                                        None => {}
                                     }
+                                    None => {}
                                 }
+                            } else {
+                                self.stmt = Vec::new();
+                                if let ExecutionMode::Script = self.execution_mode {
+                                } else {
+                                    println!("条件が一致しなかったので、ループを脱出します");
+                                }
+                                break;
                             }
-                            self.control_mode = ControlMode::Normal;
                         }
+                        self.control_mode = ControlMode::Normal;
                     }
                 } else if code.contains("while") {
                     self.nest_while += 1;
@@ -454,6 +449,9 @@ impl<'a> Executor<'a> {
                             }
                             text += "]";
                         }
+                        Type::Bool(b) => {
+                            text += &b.to_string();
+                        }
                     }
                     if let ExecutionMode::Script = self.execution_mode {
                         println!("{text}");
@@ -537,6 +535,9 @@ impl<'a> Executor<'a> {
                                         }
                                     }
                                     println!("]");
+                                }
+                                Type::Bool(b) => {
+                                    println!("{}", &b.to_string());
                                 }
                             }
                         }
@@ -1084,6 +1085,9 @@ impl<'a> Executor<'a> {
                                 }
                                 println!("]");
                             }
+                            Type::Bool(b) => {
+                                println!("{}", &b.to_string());
+                            }
                         }
                     }
                 } else {
@@ -1378,10 +1382,16 @@ impl<'a> Executor<'a> {
                             Type::Number(i) => i.to_string(),
                             Type::String(s) => format!("'{s}'"),
                             Type::List(_) => "".to_string(),
+                            Type::Bool(b) => {
+                                b.to_string()
+                            }
                         })
                         .collect::<Vec<String>>()
                         .join(", ")
                 )),
+                Type::Bool(b) => {
+                    format!("var {i} = {}", &b.to_string());
+                }
             }
         }
 
@@ -1659,10 +1669,12 @@ impl<'a> Executor<'a> {
                                         Type::Number(i) => i.to_string(),
                                         Type::String(s) => format!("'{s}'"),
                                         Type::List(_) => "".to_string(),
+                                        Type::Bool(b) => b.to_string(),
                                     })
                                     .collect::<Vec<String>>()
                                     .join(", ")
                             ),
+                            Type::Bool(b) => b.to_string(),
                         })
                         .collect::<Vec<String>>()
                         .join(", "),
@@ -1685,10 +1697,12 @@ impl<'a> Executor<'a> {
                                 Type::Number(i) => i.to_string(),
                                 Type::String(s) => format!("'{s}'"),
                                 Type::List(_) => "".to_string(),
+                                Type::Bool(b) => b.to_string(),
                             })
                             .collect::<Vec<String>>()
                             .join(", "),
                         Type::String(s) => s,
+                        Type::Bool(b) => b.to_string(),
                     },
                 ));
                 continue;
@@ -1712,6 +1726,30 @@ impl<'a> Executor<'a> {
                             println!("エラー! 変換できませんでした");
                             0.0
                         }),
+                        Type::Bool(b) => {
+                            if b {
+                                1.0
+                            } else {
+                                0.0
+                            }
+                        }
+                    },
+                ));
+                continue;
+            }
+
+            // 論理値に変換
+            if item.contains("(") && item.contains("bool") {
+                stack.push(Type::Bool(
+                    match self.compute(
+                        item[..item.len() - 1].split("(").collect::<Vec<&str>>()[1..]
+                            .join("(")
+                            .to_string(),
+                    ) {
+                        Type::Number(i) => i != 0.0,
+                        Type::List(l) => l.len() != 0,
+                        Type::String(s) => !s.is_empty(),
+                        Type::Bool(b) => b,
                     },
                 ));
                 continue;
@@ -1764,14 +1802,44 @@ impl<'a> Executor<'a> {
                                 (Type::String(y), Type::String(x)) => {
                                     match item {
                                         "+" => stack.push(Type::String(x + &y)),
-                                        "=" => {
-                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
-                                        }
+                                        "=" => stack.push(Type::Bool(x == y)),
+                                        ">" => stack.push(Type::Bool(x > y)),
+                                        "<" => stack.push(Type::Bool(x < y)),
                                         _ => {
                                             stack.push(Type::String(x));
                                             stack.push(Type::String(y));
                                             // 文字列として処理する
-                                            stack.push(Type::String(item.to_string()));
+                                            if item == "true" {
+                                                stack.push(Type::Bool(true));
+                                            } else if item == "false" {
+                                                stack.push(Type::Bool(false));
+                                            } else {
+                                                stack.push(Type::String(item.to_string()));
+                                            }
+                                        }
+                                    }
+                                }
+                                (Type::Bool(y), Type::Bool(x)) => {
+                                    match item {
+                                        "&" => stack.push(Type::Bool(x && y)),
+                                        "=" => stack.push(Type::Bool(x == y)),
+                                        "|" => stack.push(Type::Bool(x || y)),
+                                        "!" => {
+                                            stack.push(Type::Bool(x));
+                                            stack.push(Type::Bool(!y));
+                                            continue;
+                                        }
+                                        _ => {
+                                            stack.push(Type::Bool(x));
+                                            stack.push(Type::Bool(y));
+                                            // 文字列として処理する
+                                            if item == "true" {
+                                                stack.push(Type::Bool(true));
+                                            } else if item == "false" {
+                                                stack.push(Type::Bool(false));
+                                            } else {
+                                                stack.push(Type::String(item.to_string()));
+                                            }
                                         }
                                     }
                                 }
@@ -1783,36 +1851,9 @@ impl<'a> Executor<'a> {
                                         "/" => stack.push(Type::Number(x / y)),
                                         "%" => stack.push(Type::Number(x % y)),
                                         "^" => stack.push(Type::Number(x.powf(y))),
-                                        "=" => {
-                                            stack.push(Type::Number(if x == y { 1.0 } else { 0.0 }))
-                                        }
-                                        "&" => {
-                                            stack.push(Type::Number(if x != 0.0 && y != 0.0 {
-                                                1.0 // 論理値はfalseを0.0,trueを1.0として表す
-                                            } else {
-                                                0.0
-                                            }))
-                                        }
-                                        "|" => stack.push(Type::Number(if x != 0.0 || y != 0.0 {
-                                            1.0
-                                        } else {
-                                            0.0
-                                        })),
-                                        ">" => {
-                                            stack.push(Type::Number(if x > y { 1.0 } else { 0.0 }))
-                                        }
-                                        "<" => {
-                                            stack.push(Type::Number(if x < y { 1.0 } else { 0.0 }))
-                                        }
-                                        "!" => {
-                                            stack.push(Type::Number(x));
-                                            stack.push(Type::Number(if y == 0.0 {
-                                                1.0
-                                            } else {
-                                                0.0
-                                            }));
-                                            continue;
-                                        }
+                                        "=" => stack.push(Type::Bool(x == y)),
+                                        ">" => stack.push(Type::Bool(x > y)),
+                                        "<" => stack.push(Type::Bool(x < y)),
                                         "~" => {
                                             stack.push(Type::Number(x));
 
@@ -1834,7 +1875,13 @@ impl<'a> Executor<'a> {
                                             stack.push(Type::Number(x));
                                             stack.push(Type::Number(y));
                                             // 文字列として処理する
-                                            stack.push(Type::String(item.to_string()));
+                                            if item == "true" {
+                                                stack.push(Type::Bool(true));
+                                            } else if item == "false" {
+                                                stack.push(Type::Bool(false));
+                                            } else {
+                                                stack.push(Type::String(item.to_string()));
+                                            }
                                         }
                                     }
                                 }
@@ -1848,7 +1895,13 @@ impl<'a> Executor<'a> {
                                             stack.push(Type::List(x));
                                             stack.push(Type::List(y));
                                             // 文字列として処理する
-                                            stack.push(Type::String(item.to_string()));
+                                            if item == "true" {
+                                                stack.push(Type::Bool(true));
+                                            } else if item == "false" {
+                                                stack.push(Type::Bool(false));
+                                            } else {
+                                                stack.push(Type::String(item.to_string()));
+                                            }
                                         }
                                     }
                                 }
@@ -1867,7 +1920,7 @@ impl<'a> Executor<'a> {
                                             0.0
                                         }
                                     };
-                                    stack.push(Type::Number(if y == 0.0 { 1.0 } else { 0.0 }));
+                                    stack.push(Type::Bool(y == 0.0));
                                     continue;
                                 }
                                 "~" => {
@@ -1896,12 +1949,24 @@ impl<'a> Executor<'a> {
 
                                 _ => {
                                     // 文字列として処理する
-                                    stack.push(Type::String(item.to_string()));
+                                    if item == "true" {
+                                        stack.push(Type::Bool(true));
+                                    } else if item == "false" {
+                                        stack.push(Type::Bool(false));
+                                    } else {
+                                        stack.push(Type::String(item.to_string()));
+                                    }
                                 }
                             }
                         } else {
                             // 文字列として処理する
-                            stack.push(Type::String(item.to_string()));
+                            if item == "true" {
+                                stack.push(Type::Bool(true));
+                            } else if item == "false" {
+                                stack.push(Type::Bool(false));
+                            } else {
+                                stack.push(Type::String(item.to_string()));
+                            }
                         }
                     }
                 }
@@ -1923,10 +1988,12 @@ impl<'a> Executor<'a> {
                                 Type::Number(i) => i.to_string(),
                                 Type::String(s) => format!("'{s}'"),
                                 Type::List(_) => "".to_string(),
+                                Type::Bool(b) => b.to_string(),
                             })
                             .collect::<Vec<String>>()
                             .join(", ")
                     ),
+                    Type::Bool(b) => b.to_string(),
                 }
             );
         }
