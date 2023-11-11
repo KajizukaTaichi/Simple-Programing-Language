@@ -1,9 +1,8 @@
-use rand::Rng;
 use std::io::{self, Write};
 use std::process::exit;
 
 /// 標準入力を取得する
-fn input(prompt: &str) -> String {
+pub fn input(prompt: &str) -> String {
     print!("{}", prompt);
     io::stdout().flush().unwrap();
     let mut result = String::new();
@@ -15,8 +14,8 @@ fn input(prompt: &str) -> String {
 pub enum Type {
     Number(f64),
     String(String),
-    List(Vec<Type>),
     Bool(bool),
+    List(Vec<Type>),
 }
 
 /// 変数のデータ
@@ -36,7 +35,7 @@ pub struct Function {
 
 /// 制御モード
 #[derive(Clone)]
-enum ControlMode {
+pub enum ControlMode {
     If,
     Else,
     For,
@@ -55,19 +54,18 @@ pub enum ExecutionMode {
 
 /// コードを実行を管理
 pub struct Executor<'a> {
-    memory: &'a mut Vec<Variable>,     //　メモリ内の変数
-    name_space: &'a mut Vec<Function>, // 関数の名前空間
-    stmt: Vec<String>,                 // ブロックのステートメント
-    else_stmt: Vec<String>,            // elseステートメント
-    count: usize,                      // ループカウンタ
-    data: String,                      // 関数のデータ
-    expr: String,                      // 条件式
-    control_mode: ControlMode,         // 制御ブロックの状態
-    execution_mode: ExecutionMode,     // 制御ブロックの状態
-    nest_if: usize,                    // ifネストの階層を表す
-    nest_for: usize,                   // forネストの階層を表す
-    nest_while: usize,                 // whileネストの階層を表す
-    nest_func: usize,                  // funcネストの階層を表す
+    pub memory: &'a mut Vec<Variable>,     //　メモリ内の変数
+    pub name_space: &'a mut Vec<Function>, // 関数の名前空間
+    pub stmt: Vec<String>,                 // ブロックのステートメント
+    pub else_stmt: Vec<String>,            // elseステートメント
+    data: String,                          // 関数のデータ
+    expr: String,                          // 条件式
+    pub execution_mode: ExecutionMode,     // 制御ブロックの状態
+    pub control_mode: ControlMode,         // 制御ブロックの状態
+    pub nest_if: usize,                    // ifネストの階層を表す
+    pub nest_for: usize,                   // forネストの階層を表す
+    pub nest_while: usize,                 // whileネストの階層を表す
+    pub nest_func: usize,                  // funcネストの階層を表す
 }
 
 impl<'a> Executor<'a> {
@@ -82,7 +80,6 @@ impl<'a> Executor<'a> {
             name_space: name_space,
             stmt: Vec::new(),
             else_stmt: Vec::new(),
-            count: 0,
             data: "".to_string(),
             expr: "".to_string(),
             control_mode: ControlMode::Normal,
@@ -96,15 +93,6 @@ impl<'a> Executor<'a> {
 
     /// 文の実行
     pub fn execute(&mut self, code: String) -> Option<Type> {
-        let code = if let ControlMode::Function = self.control_mode {
-            code.as_str()
-        } else {
-            code.trim().split("#").collect::<Vec<&str>>()[0]
-        };
-        if code == "" {
-            return None;
-        }
-
         match self.control_mode {
             ControlMode::For => {
                 if code.contains("end for") {
@@ -113,11 +101,14 @@ impl<'a> Executor<'a> {
                         self.nest_for -= 1;
                         self.stmt.push(code.to_string());
                     } else {
-                        for i in 0..self.count {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("{}回目のループ", i + 1);
-                            }
+                        let count = if let Type::Number(i) = self.compute(self.expr.clone()) {
+                            i.round() as usize
+                        } else {
+                            self.log_print("エラー! ループ回数は数値型です".to_string());
+                            0
+                        };
+                        for i in 0..count {
+                            self.log_print(format!("{}回目のループ", i + 1));
 
                             let status = Executor::new(
                                 &mut self.memory,
@@ -166,15 +157,9 @@ impl<'a> Executor<'a> {
                         self.nest_if -= 1;
                         self.stmt.push(code.to_string());
                     } else {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("ifの条件式を評価します");
-                        }
+                        self.log_print(format!("ifの条件式を評価します"));
                         if let Type::Bool(true) = self.compute(self.expr.clone()) {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("条件が一致したので、実行します");
-                            }
+                            self.log_print(format!("条件が一致したので、実行します"));
 
                             let status = Executor::new(
                                 &mut self.memory,
@@ -191,10 +176,7 @@ impl<'a> Executor<'a> {
                             }
                             self.stmt = Vec::new();
                         } else {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("条件が一致しなかったので、実行しません");
-                            }
+                            self.log_print(format!("条件が一致しなかったので、実行しません"));
                             self.stmt = Vec::new();
                         }
                         self.control_mode = ControlMode::Normal;
@@ -213,15 +195,9 @@ impl<'a> Executor<'a> {
                         self.nest_if -= 1;
                         self.else_stmt.push(code.to_string());
                     } else {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("ifの条件式を評価します");
-                        }
+                        self.log_print(format!("ifの条件式を評価します"));
                         if let Type::Bool(true) = self.compute(self.expr.clone()) {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("条件が一致したので、実行します");
-                            }
+                            self.log_print(format!("条件が一致したので、実行します"));
 
                             let status = Executor::new(
                                 &mut self.memory,
@@ -239,10 +215,9 @@ impl<'a> Executor<'a> {
                             self.else_stmt = Vec::new();
                             self.stmt = Vec::new();
                         } else {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("条件が一致しなかったので、elseのコードを実行します");
-                            }
+                            self.log_print(format!(
+                                "条件が一致しなかったので、elseのコードを実行します"
+                            ));
 
                             let status = Executor::new(
                                 &mut self.memory,
@@ -276,15 +251,9 @@ impl<'a> Executor<'a> {
                         self.stmt.push(code.to_string());
                     } else {
                         loop {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("whileの条件式を評価します");
-                            }
+                            self.log_print(format!("whileの条件式を評価します"));
                             if let Type::Bool(true) = self.compute(self.expr.clone()) {
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("条件が一致したので、ループを継続します");
-                                }
+                                self.log_print(format!("条件が一致したので、ループを継続します"));
                                 if let ExecutionMode::Interactive = self.execution_mode {
                                     self.execution_mode = ExecutionMode::Debug
                                 }
@@ -314,10 +283,9 @@ impl<'a> Executor<'a> {
                                 }
                             } else {
                                 self.stmt = Vec::new();
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("条件が一致しなかったので、ループを脱出します");
-                                }
+                                self.log_print(format!(
+                                    "条件が一致しなかったので、ループを脱出します"
+                                ));
                                 break;
                             }
                         }
@@ -362,10 +330,7 @@ impl<'a> Executor<'a> {
                         self.set_list_value(name.to_string(), value);
                     } else {
                         let name = name.replace(" ", "");
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("変数{}を定義します", name);
-                        }
+                        self.log_print(format!("変数{}を定義します", name));
                         self.set_variable(name, expr);
                     }
                 } else if code.contains("func") {
@@ -385,26 +350,15 @@ impl<'a> Executor<'a> {
                         .map(|s| s.to_string())
                         .collect::<Vec<String>>()[0];
 
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("関数{}を定義します", name);
-                    }
+                    self.log_print(format!("関数{}を定義します", name));
                     self.control_mode = ControlMode::Function;
                 } else if code.contains("call") {
                     // 関数呼び出し
                     self.call_function(code.to_string());
                 } else if code.contains("for") {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("ループ回数を求めます");
-                    }
+                    self.log_print(format!("ループ回数を求めます"));
                     let new_code = code.replacen("for", "", 1);
-                    self.count = if let Type::Number(i) = self.compute(new_code) {
-                        i.round() as usize // ループ回数
-                    } else {
-                        println!("エラー! ループ回数は数値型です");
-                        1
-                    };
+                    self.expr = new_code;
                     self.control_mode = ControlMode::For;
                 } else if code.contains("if") {
                     self.expr = code.replacen("if", "", 1);
@@ -412,176 +366,15 @@ impl<'a> Executor<'a> {
                 } else if code.contains("while") {
                     self.expr = code.replacen("while", "", 1);
                     self.control_mode = ControlMode::While;
-                } else if code.contains("input") {
-                    // 標準入力
-                    let new_code = code.replacen("input", "", 1);
-                    let name = &new_code;
-                    let inputed = if let ExecutionMode::Script = self.execution_mode {
-                        input("> ")
-                    } else {
-                        println!("標準入力を受け取ります");
-                        input("[入力]> ")
-                    };
-                    self.set_variable(name.trim().replace(" ", ""), inputed.to_string());
                 } else if code.contains("print") {
                     //　標準出力
-                    let new_code = code.replacen("print", "", 1);
-                    let mut text = String::new();
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("標準出力に表示します");
-                    }
-                    match self.compute(new_code.trim().to_string()) {
-                        Type::Number(i) => {
-                            text += i.to_string().as_str();
-                        }
-                        Type::String(s) => {
-                            text += s.replace("'", "").replace('"', "").as_str();
-                        }
-                        Type::List(l) => {
-                            text += "[";
-                            for i in l {
-                                match i {
-                                    Type::Number(i) => text += format!("{}, ", i).as_str(),
-                                    Type::String(s) => text += format!("'{}' , ", s).as_str(),
-                                    _ => {}
-                                }
-                            }
-                            text += "]";
-                        }
-                        Type::Bool(b) => {
-                            text += &b.to_string();
-                        }
-                    }
-                    if let ExecutionMode::Script = self.execution_mode {
-                        println!("{text}");
-                    } else {
-                        println!("[出力]: {text}");
-                    }
+                    let text = self
+                        .tokenize_arguments(code.replacen("print", "", 1).as_str())
+                        .join(",");
+                    self.print(text);
                 } else if code.contains("ref") {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("変数の参照を取得します")
-                    }
-                    let code = code.replacen("ref", "", 1);
-                    if code.contains("=") {
-                        let params: Vec<&str> = code.split("=").collect();
-                        let address = self.reference_variable(params[1..].join("=").to_string());
-                        if let Some(i) = address {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("変数{}のアドレスは{}です", params[1], i);
-                            }
-                            self.set_variable(params[0].to_string(), i.to_string());
-                        }
-                    } else {
-                        let address = self.reference_variable(code.clone());
-                        if let Some(i) = address {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("変数{}のアドレスは{}です", code, i);
-                            }
-                        }
-                    }
                 } else if code.contains("mem") {
-                    let mut name_max_len = 0;
-                    for i in self.memory.iter() {
-                        if name_max_len < i.name.len() {
-                            name_max_len = i.name.len()
-                        }
-                    }
-
-                    let mut value_max_len = 0;
-                    for item in self.memory.iter() {
-                        if let Type::Number(i) = item.value {
-                            if value_max_len < i.to_string().len() {
-                                value_max_len = i.to_string().len()
-                            }
-                        }
-                    }
-
-                    if !self.memory.is_empty() {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("+-- メモリ内の変数");
-                        }
-                        for index in 0..self.memory.len() {
-                            let vars = &self.memory[index];
-                            match &vars.value {
-                                Type::Number(i) => {
-                                    println!(
-                                        "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
-                                        index, vars.name, i
-                                    )
-                                }
-                                Type::String(s) => {
-                                    println!(
-                                        "| [{:>3}] {:<name_max_len$} : '{}' ",
-                                        index, vars.name, s
-                                    )
-                                }
-                                Type::List(l) => {
-                                    print!("| [{:>3}] {:<name_max_len$} : [", index, vars.name);
-
-                                    for i in l {
-                                        match i {
-                                            Type::Number(i) => {
-                                                print!("{:>value_max_len$}, ", i)
-                                            }
-                                            Type::String(s) => {
-                                                print!("'{}' , ", s)
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                    println!("]");
-                                }
-                                Type::Bool(b) => {
-                                    println!(
-                                        "| [{:>3}] {:<name_max_len$} : {}",
-                                        index,
-                                        vars.name,
-                                        &b.to_string()
-                                    );
-                                }
-                            }
-                        }
-                    } else {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("変数がありません");
-                        }
-                    }
-                    if !self.name_space.is_empty() {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("+-- メモリ内の関数");
-                        }
-                        for i in self.name_space.iter() {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("| +--  {} ({}) ", i.name, i.args.join(", "));
-                            }
-                            let mut number = 0; //行数
-                            for j in i.code.iter() {
-                                if j != "" {
-                                    number += 1;
-                                    if let ExecutionMode::Script = self.execution_mode {
-                                    } else {
-                                        println!(
-                                            "| | {number:>len$}: {j}",
-                                            len = i.code.len().to_string().len()
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("関数がありません");
-                        }
-                    }
+                    self.show_memory()
                 } else if code.contains("del") {
                     // 変数や関数の削除
                     let new_code = code.replacen("del", "", 1);
@@ -589,15 +382,9 @@ impl<'a> Executor<'a> {
                     if name.contains("(") {
                         if let Some(index) = self.reference_function(name.to_owned()) {
                             self.name_space.remove(index);
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("関数{}を削除しました", name);
-                            }
+                            self.log_print(format!("関数{}を削除しました", name));
                         } else {
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("関数{name}が見つかりません");
-                            }
+                            self.log_print(format!("関数{name}が見つかりません"));
                         }
                     } else {
                         if name.contains("[") {
@@ -606,86 +393,26 @@ impl<'a> Executor<'a> {
                             match self.reference_variable(name.clone()) {
                                 Some(index) => {
                                     self.memory.remove(index);
-                                    if let ExecutionMode::Script = self.execution_mode {
-                                    } else {
-                                        println!("変数{}を削除しました", name);
-                                    }
+                                    self.log_print(format!("変数{}を削除しました", name));
                                 }
                                 None => {
-                                    if let ExecutionMode::Script = self.execution_mode {
-                                    } else {
-                                        println!("変数{name}が見つかりません");
-                                    }
+                                    self.log_print(format!("変数{name}が見つかりません"));
                                 }
                             }
                         }
                     }
-                } else if code.contains("rand") {
-                    // 乱数
-                    let new_code = code.replacen("rand", "", 1);
-                    let params = new_code.split(",").collect::<Vec<&str>>();
-                    if params.len() < 3 {
-                        let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
-                        let temp: i64 = rng.gen_range(1, 10);
-                        self.set_variable(params[0].trim().replace(" ", ""), temp.to_string());
-                    } else {
-                        let mut rng = rand::thread_rng(); // デフォルトの乱数生成器を初期化します
-                        let temp: i64 = rng.gen_range(
-                            if let Type::Number(i) = self.compute({
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("最小値を求めます");
-                                }
-                                String::from(params[1])
-                            }) {
-                                i.round() as i64
-                            } else {
-                                println!("エラー! 文字列型変数は使えません");
-                                0
-                            },
-                            if let Type::Number(i) = self.compute({
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!("最小値を求めます");
-                                }
-                                String::from(params[2])
-                            }) {
-                                i.round() as i64
-                            } else {
-                                println!("エラー! 文字列型変数は使えません");
-                                1
-                            },
-                        );
-                        self.set_variable(params[0].trim().replace(" ", ""), temp.to_string());
-                    }
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("乱数を生成しました");
-                    }
                 } else if code.contains("return") {
                     let return_value = code.replacen("return", "", 1);
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("戻り値を返します");
-                    }
+                    self.log_print(format!("戻り値を返します"));
                     return Some(self.compute(return_value));
                 } else if code.contains("break") {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("ループを脱出します");
-                    }
+                    self.log_print(format!("ループを脱出します"));
                     return Some(Type::Number(f64::MAX)); //ステータスコード
                 } else if code.contains("next") {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("次のループへ移ります");
-                    }
+                    self.log_print(format!("次のループへ移ります"));
                     return Some(Type::Number(f64::MIN)); //ステータスコード
                 } else if code == "exit" {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("プロセスを終了します");
-                    }
+                    self.log_print(format!("プロセスを終了します"));
                     exit(0)
                 } else {
                     if let ExecutionMode::Script = self.execution_mode {
@@ -702,8 +429,34 @@ impl<'a> Executor<'a> {
     pub fn execute_block(&mut self, code: Vec<String>) -> Option<Type> {
         let mut number = 0;
         for lin in code.iter() {
-            let lin = lin.trim().split("#").collect::<Vec<&str>>()[0];
-            if lin == "" {
+            let lin = if let ControlMode::Normal = self.control_mode {
+                let params = lin.trim().split("#").collect::<Vec<&str>>();
+                if params.len() > 1 {
+                    if !params[1..]
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join("#")
+                        .is_empty()
+                    {
+                        if let ExecutionMode::Script = self.execution_mode {
+                        } else {
+                            println!(
+                                "※ コメント「{}」",
+                                params[1..]
+                                    .iter()
+                                    .map(|x| x.to_string())
+                                    .collect::<Vec<String>>()
+                                    .join("#")
+                            );
+                        }
+                    }
+                }
+                params[0]
+            } else {
+                lin.as_str()
+            };
+            if lin.trim().split("#").collect::<Vec<&str>>()[0].is_empty() {
                 continue;
             }
 
@@ -750,220 +503,39 @@ impl<'a> Executor<'a> {
                 )
                 .as_str(),
             );
-            self.execute(code);
-        }
-    }
-
-    /// 構文チェック
-    pub fn check(&mut self, code: Vec<String>) {
-        for code in code {
-            let code = if let ControlMode::Function = self.control_mode {
-                code.as_str()
+            let code = if let ControlMode::Normal = self.control_mode {
+                let params = code.trim().split("#").collect::<Vec<&str>>();
+                if params.len() > 1 {
+                    if !params[1..]
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join("#")
+                        .is_empty()
+                    {
+                        if let ExecutionMode::Script = self.execution_mode {
+                        } else {
+                            println!(
+                                "※ コメント「{}」",
+                                params[1..]
+                                    .iter()
+                                    .map(|x| x.to_string())
+                                    .collect::<Vec<String>>()
+                                    .join("#")
+                            );
+                        }
+                    }
+                }
+                params[0]
             } else {
-                code.trim().split("#").collect::<Vec<&str>>()[0]
+                code.as_str()
             };
-            if code == "" {
+            if code.trim().is_empty() {
                 continue;
             }
 
-            match self.control_mode {
-                ControlMode::For => {
-                    if code.contains("end for") {
-                        // ネストの階層を判別する
-                        if self.nest_for > 0 {
-                            self.nest_for -= 1;
-                            self.stmt.push(code.to_string());
-                        } else {
-                            self.control_mode = ControlMode::Normal;
-                            Executor::new(
-                                &mut self.memory,
-                                &mut self.name_space,
-                                self.execution_mode.clone(),
-                            )
-                            .check(self.stmt.clone());
-                            self.stmt = Vec::new();
-                        }
-                    } else if code.contains("for") {
-                        // ネストの階層を上げる
-                        self.nest_for += 1;
-                        self.stmt.push(code.to_string());
-                    } else {
-                        // コードを追加する
-                        self.stmt.push(code.to_string());
-                    }
-                }
-
-                ControlMode::If => {
-                    if code.contains("else") {
-                        // モードをelseに変える
-                        self.control_mode = ControlMode::Else
-                    } else if code.contains("end if") {
-                        if self.nest_if > 0 {
-                            self.nest_if -= 1;
-                            self.stmt.push(code.to_string());
-                        } else {
-                            self.control_mode = ControlMode::Normal;
-                            if let Type::Number(i) = self.compute(self.expr.clone()) {
-                                Executor::new(
-                                    &mut self.memory,
-                                    &mut self.name_space,
-                                    self.execution_mode.clone(),
-                                )
-                                .check(self.stmt.clone());
-                                if i == 0.0 {
-                                    self.stmt = Vec::new();
-                                } else {
-                                    self.stmt = Vec::new();
-                                }
-                            }
-                        }
-                    } else if code.contains("if") {
-                        self.nest_if += 1;
-                        self.stmt.push(code.to_string());
-                    } else {
-                        self.stmt.push(code.to_string());
-                    }
-                }
-
-                ControlMode::Else => {
-                    if code.contains("end if") {
-                        if self.nest_if > 0 {
-                            self.nest_if -= 1;
-                            self.else_stmt.push(code.to_string());
-                        } else {
-                            self.control_mode = ControlMode::Normal;
-                            if let Type::Number(i) = self.compute(self.expr.clone()) {
-                                if i == 0.0 {
-                                    Executor::new(
-                                        &mut self.memory,
-                                        &mut self.name_space,
-                                        self.execution_mode.clone(),
-                                    )
-                                    .check(self.else_stmt.clone());
-
-                                    self.else_stmt = Vec::new();
-                                    self.stmt = Vec::new();
-                                } else {
-                                    Executor::new(
-                                        &mut self.memory,
-                                        &mut self.name_space,
-                                        self.execution_mode.clone(),
-                                    )
-                                    .check(self.stmt.clone());
-                                    self.else_stmt = Vec::new();
-                                    self.stmt = Vec::new();
-                                }
-                            }
-                        }
-                    } else if code.contains("if") {
-                        self.nest_if += 1;
-                        self.else_stmt.push(code.to_string());
-                    } else {
-                        self.else_stmt.push(code.to_string());
-                    }
-                }
-                ControlMode::While => {
-                    if code.contains("end while") {
-                        if self.nest_while > 0 {
-                            self.nest_while -= 1;
-                            self.stmt.push(code.to_string());
-                        } else {
-                            self.control_mode = ControlMode::Normal;
-                            Executor::new(
-                                &mut self.memory,
-                                &mut self.name_space,
-                                self.execution_mode.clone(),
-                            )
-                            .check(self.stmt.clone());
-                        }
-                    } else if code.contains("while") {
-                        self.nest_while += 1;
-                        self.stmt.push(code.to_string());
-                    } else {
-                        self.stmt.push(code.to_string());
-                    }
-                }
-
-                ControlMode::Function => {
-                    if code.contains("end func") {
-                        if self.nest_func > 0 {
-                            self.nest_func -= 1;
-                            self.stmt.push(code.to_string());
-                        } else {
-                            self.control_mode = ControlMode::Normal;
-                            Executor::new(
-                                &mut self.memory,
-                                &mut self.name_space,
-                                self.execution_mode.clone(),
-                            )
-                            .check(self.stmt.clone());
-                            self.stmt = Vec::new();
-                        }
-                    } else if code.contains("func") {
-                        self.nest_func += 1;
-                        self.stmt.push(code.to_string());
-                    } else {
-                        self.stmt.push(code.to_string());
-                    }
-                }
-
-                ControlMode::Normal => {
-                    if code.contains("var") {
-                        // 変数の定義
-                        let new_code = code.replacen("var", "", 1);
-                        if !&new_code.contains("=") {
-                            println!("エラー! 変数名と式の間にイコールをいれてください");
-                        }
-                    } else if code.contains("func") {
-                        //　関数の定義
-                        if !code.contains("(") {
-                            println!("エラー! 関数にはカッコをつけてください");
-                        }
-                        self.control_mode = ControlMode::Function;
-                    } else if code.contains("call") {
-                        // 関数呼び出し
-                        if !code.contains("(") {
-                            println!("エラー! 関数にはカッコをつけてください");
-                        }
-                    } else if code.contains("for") {
-                        self.control_mode = ControlMode::For;
-                    } else if code.contains("if") {
-                        self.expr = code.replacen("if", "", 1);
-                        self.control_mode = ControlMode::If
-                    } else if code.contains("while") {
-                        self.expr = code.replacen("while", "", 1);
-                        self.control_mode = ControlMode::While;
-                    } else if code.contains("rand") {
-                        // 乱数
-                        let new_code = code.replacen("rand", "", 1);
-                        let params = new_code.split(",").collect::<Vec<&str>>();
-                        if params.len() < 3 {
-                            println!("エラー! rand分には3つに引数が必要です");
-                        }
-                    } else {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("エラー! コマンドが不正です: {}", code);
-                        }
-                    }
-                }
-            }
+            self.execute(code.to_string());
         }
-        match self.control_mode {
-            ControlMode::Function => {
-                println!("エラー! 関数の終わりが見つかりません");
-            }
-            ControlMode::If | ControlMode::Else => {
-                println!("エラー! if文の終わりが見つかりません");
-            }
-            ControlMode::For => {
-                println!("エラー! for文の終わりが見つかりません");
-            }
-            ControlMode::While => {
-                println!("エラー! while文の終わりが見つかりません");
-            }
-            ControlMode::Normal => {}
-        };
     }
 
     /// スクリプトを実行する
@@ -998,19 +570,13 @@ impl<'a> Executor<'a> {
                 if name.contains("(") {
                     if let Some(index) = self.reference_function(name.to_owned()) {
                         self.name_space.remove(index);
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("関数{}を削除しました", name);
-                        }
+                        self.log_print(format!("関数{}を削除しました", name));
                     }
                 } else {
                     match self.reference_variable(name.clone()) {
                         Some(index) => {
                             self.memory.remove(index);
-                            if let ExecutionMode::Script = self.execution_mode {
-                            } else {
-                                println!("変数{}を削除しました", name);
-                            }
+                            self.log_print(format!("変数{}を削除しました", name));
                         }
                         None => {}
                     }
@@ -1025,118 +591,17 @@ impl<'a> Executor<'a> {
                     let params: Vec<&str> = lines.split("=").collect();
                     let address = self.reference_variable(params[1..].join("=").to_string());
                     if let Some(i) = address {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("変数{}のアドレスは{}です", params[0], i);
-                        }
+                        self.log_print(format!("変数{}のアドレスは{}です", params[0], i));
                         self.set_variable(params[0].to_string(), i.to_string());
                     }
                 } else {
                     let address = self.reference_variable(lines.clone());
                     if let Some(i) = address {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("変数{}のアドレスは{}です", lines, i);
-                        }
+                        self.log_print(format!("変数{}のアドレスは{}です", lines, i));
                     }
                 }
             } else if menu.contains("mem") {
-                let mut name_max_len = 0;
-                for i in self.memory.iter() {
-                    if name_max_len < i.name.len() {
-                        name_max_len = i.name.len()
-                    }
-                }
-
-                let mut value_max_len = 0;
-                for item in self.memory.iter() {
-                    if let Type::Number(i) = item.value {
-                        if value_max_len < i.to_string().len() {
-                            value_max_len = i.to_string().len()
-                        }
-                    }
-                }
-
-                if !self.memory.is_empty() {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("+-- メモリ内の変数");
-                    }
-                    for index in 0..self.memory.len() {
-                        let vars = &self.memory[index];
-                        match &vars.value {
-                            Type::Number(i) => {
-                                println!(
-                                    "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
-                                    index, vars.name, i
-                                )
-                            }
-                            Type::String(s) => {
-                                println!("| [{:>3}] {:<name_max_len$} : '{}' ", index, vars.name, s)
-                            }
-                            Type::List(l) => {
-                                print!("| [{:>3}] {:<name_max_len$} : [", index, vars.name);
-
-                                for i in l {
-                                    match i {
-                                        Type::Number(i) => {
-                                            print!("{:>value_max_len$}, ", i)
-                                        }
-                                        Type::String(s) => {
-                                            print!("'{}' , ", s)
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                                println!("]");
-                            }
-                            Type::Bool(b) => {
-                                println!(
-                                    "| [{:>3}] {:<name_max_len$} : {}",
-                                    index,
-                                    vars.name,
-                                    &b.to_string()
-                                );
-                            }
-                        }
-                    }
-                } else {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("変数がありません");
-                    }
-                }
-
-                if !self.name_space.is_empty() {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("+-- メモリ内の関数");
-                    }
-                    for i in self.name_space.iter() {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("| +--  {} ({}) ", i.name, i.args.join(", "));
-                        }
-                        let mut number = 0; //行数
-                        for j in i.code.iter() {
-                            if j != "" {
-                                number += 1;
-                                if let ExecutionMode::Script = self.execution_mode {
-                                } else {
-                                    println!(
-                                        "| | {number:>len$}: {j}",
-                                        len = i.code.len().to_string().len()
-                                    );
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("関数がありません");
-                    }
-                }
+                self.show_memory();
             } else if menu.contains("exit") {
                 input("デバッグを中断します");
                 exit(0)
@@ -1147,8 +612,98 @@ impl<'a> Executor<'a> {
         }
     }
 
+    pub fn log_print(&self, text: String) {
+        if let ExecutionMode::Script = self.execution_mode {
+        } else {
+            println!("{text}");
+        }
+    }
+
+    fn show_memory(&self) {
+        let mut name_max_len = 0;
+        for i in self.memory.iter() {
+            if name_max_len < i.name.len() {
+                name_max_len = i.name.len()
+            }
+        }
+
+        let mut value_max_len = 0;
+        for item in self.memory.iter() {
+            if let Type::Number(i) = item.value {
+                if value_max_len < i.to_string().len() {
+                    value_max_len = i.to_string().len()
+                }
+            }
+        }
+
+        if !self.memory.is_empty() {
+            self.log_print(format!("+-- メモリ内の変数"));
+            for index in 0..self.memory.len() {
+                let vars = &self.memory[index];
+                match &vars.value {
+                    Type::Number(i) => {
+                        println!(
+                            "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
+                            index, vars.name, i
+                        )
+                    }
+                    Type::String(s) => {
+                        println!("| [{:>3}] {:<name_max_len$} : '{}' ", index, vars.name, s)
+                    }
+                    Type::List(l) => {
+                        print!("| [{:>3}] {:<name_max_len$} : [", index, vars.name);
+
+                        for i in l {
+                            match i {
+                                Type::Number(i) => {
+                                    print!("{:>value_max_len$}, ", i)
+                                }
+                                Type::String(s) => {
+                                    print!("'{}' , ", s)
+                                }
+                                _ => {}
+                            }
+                        }
+                        println!("]");
+                    }
+                    Type::Bool(b) => {
+                        println!(
+                            "| [{:>3}] {:<name_max_len$} : {}",
+                            index,
+                            vars.name,
+                            &b.to_string()
+                        );
+                    }
+                }
+            }
+        } else {
+            self.log_print(format!("変数がありません"));
+        }
+        if !self.name_space.is_empty() {
+            self.log_print(format!("+-- メモリ内の関数"));
+            for i in self.name_space.iter() {
+                self.log_print(format!("| +--  {} ({}) ", i.name, i.args.join(", ")));
+                let mut number = 0; //行数
+                for j in i.code.iter() {
+                    if j != "" {
+                        number += 1;
+                        if let ExecutionMode::Script = self.execution_mode {
+                        } else {
+                            println!(
+                                "| | {number:>len$}: {j}",
+                                len = i.code.len().to_string().len()
+                            );
+                        }
+                    }
+                }
+            }
+        } else {
+            self.log_print(format!("関数がありません"));
+        }
+    }
+
     /// 変数の参照
-    fn reference_variable(&mut self, name: String) -> Option<usize> {
+    pub fn reference_variable(&mut self, name: String) -> Option<usize> {
         let name = name.trim().replace(" ", "").replace("　", "");
         self.memory.iter().position(|x| x.name == name)
     }
@@ -1164,25 +719,16 @@ impl<'a> Executor<'a> {
         if let Type::List(l) = self.get_variable_value(name.clone()) {
             let index = if let Type::Number(i) = self.compute(new_lines[1].clone()) {
                 let j = (i - 1.0) as usize;
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("{name}のインデックス{i}の値を求めます");
-                }
+                self.log_print(format!("{name}のインデックス{i}の値を求めます"));
                 if j < l.len() {
                     j
                 } else {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("エラー! {i}は{name}のインデックス範囲外です");
-                    };
+                    self.log_print(format!("エラー! {i}は{name}のインデックス範囲外です"));
                     return Type::Number(0.0);
                 }
             } else {
                 if let Type::String(s) = self.compute(new_lines[1].clone()) {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("{name}の長さを求めます");
-                    };
+                    self.log_print(format!("{name}の長さを求めます"));
                     if s.contains("len") {
                         if let Type::List(l) = self.get_variable_value(name) {
                             return Type::Number(l.len() as f64);
@@ -1190,10 +736,7 @@ impl<'a> Executor<'a> {
                     }
                 }
 
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("エラー! インデックスは数値型です");
-                }
+                self.log_print(format!("エラー! インデックスは数値型です"));
                 return Type::Number(0.0);
             };
             return l[index].clone();
@@ -1214,10 +757,7 @@ impl<'a> Executor<'a> {
             let len = l.len();
             l[if let Type::Number(i) = self.compute(new_lines[1].clone()) {
                 let j = (i - 1.0) as usize;
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("{name}のインデックス{i}の値を変更します");
-                }
+                self.log_print(format!("{name}のインデックス{i}の値を変更します"));
                 if j < len {
                     j
                 } else {
@@ -1229,10 +769,7 @@ impl<'a> Executor<'a> {
                     0
                 }
             } else {
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("エラー! インデックスは数値型です");
-                }
+                self.log_print(format!("エラー! インデックスは数値型です"));
                 0
             }] = value;
             let address = self.reference_variable(name.clone()).unwrap_or(0);
@@ -1253,10 +790,7 @@ impl<'a> Executor<'a> {
             l.remove(
                 if let Type::Number(i) = self.compute(new_lines[1].clone()) {
                     let j = (i - 1.0) as usize;
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("{name}のインデックス{i}の値を削除します");
-                    }
+                    self.log_print(format!("{name}のインデックス{i}の値を削除します"));
                     if j < len {
                         j
                     } else {
@@ -1268,16 +802,64 @@ impl<'a> Executor<'a> {
                         0
                     }
                 } else {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("エラー! インデックスは数値型です");
-                    }
+                    self.log_print(format!("エラー! インデックスは数値型です"));
                     return;
                 },
             );
             let address = self.reference_variable(name.clone()).unwrap_or(0);
             self.memory[address].value = Type::List(l);
         }
+    }
+
+    pub fn tokenize_arguments(&mut self, expr: &str) -> Vec<String> {
+        let mut elements = Vec::new();
+        let mut buffer = String::new();
+        let mut in_quotes = false;
+        let mut in_brackets = 0;
+        let mut in_parentheses = 0;
+
+        for c in expr.chars() {
+            match c {
+                '"' | '\'' if !in_quotes => {
+                    in_quotes = true;
+                    buffer.push('"');
+                }
+                '"' | '\'' if in_quotes => {
+                    in_quotes = false;
+                    buffer.push('"');
+                }
+                '(' if !in_quotes => {
+                    in_brackets += 1;
+                    buffer.push('(');
+                }
+                ')' if !in_quotes => {
+                    in_brackets -= 1;
+                    buffer.push(')');
+                }
+                '[' if !in_quotes => {
+                    in_parentheses += 1;
+                    buffer.push('[');
+                }
+                ']' if !in_quotes => {
+                    in_parentheses -= 1;
+                    buffer.push(']');
+                }
+                ',' if !in_quotes && in_brackets == 0 && in_parentheses == 0 => {
+                    if !buffer.is_empty() {
+                        elements.push(buffer.clone());
+                        buffer.clear();
+                    }
+                }
+                _ => {
+                    buffer.push(c);
+                }
+            }
+        }
+
+        if !buffer.is_empty() {
+            elements.push(buffer);
+        }
+        elements
     }
 
     ///　関数を呼び出す
@@ -1290,73 +872,20 @@ impl<'a> Executor<'a> {
 
         let func_name: String = params[0].replace(" ", "").replace("　", "").clone();
 
-        if let ExecutionMode::Script = self.execution_mode {
-        } else {
-            println!("引数の値を求めます");
-        }
+        self.log_print(format!("引数の値を求めます"));
 
-        fn tokenize_expression(expr: &str) -> Vec<String> {
-            let mut elements = Vec::new();
-            let mut buffer = String::new();
-            let mut in_quotes = false;
-            let mut in_brackets = 0;
-            let mut in_parentheses = 0;
-
-            for c in expr.chars() {
-                match c {
-                    '"' | '\'' if !in_quotes => {
-                        in_quotes = true;
-                        buffer.push('"');
-                    }
-                    '"' | '\'' if in_quotes => {
-                        in_quotes = false;
-                        buffer.push('"');
-                    }
-                    '(' if !in_quotes => {
-                        in_brackets += 1;
-                        buffer.push('(');
-                    }
-                    ')' if !in_quotes => {
-                        in_brackets -= 1;
-                        buffer.push(')');
-                    }
-                    '[' if !in_quotes => {
-                        in_parentheses += 1;
-                        buffer.push('[');
-                    }
-                    ']' if !in_quotes => {
-                        in_parentheses -= 1;
-                        buffer.push(']');
-                    }
-                    ',' if !in_quotes && in_brackets == 0 && in_parentheses == 0 => {
-                        if !buffer.is_empty() {
-                            elements.push(buffer.clone());
-                            buffer.clear();
-                        }
-                    }
-                    _ => {
-                        buffer.push(c);
-                    }
-                }
-            }
-
-            if !buffer.is_empty() {
-                elements.push(buffer);
-            }
-            elements
-        }
-
-        let args_value: Vec<Type> = tokenize_expression(
-            params[1..]
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join("(")
-                .as_str(),
-        )
-        .iter()
-        .map(|s| self.compute(s.to_string()))
-        .collect();
+        let args_value: Vec<Type> = self
+            .tokenize_arguments(
+                params[1..]
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join("(")
+                    .as_str(),
+            )
+            .iter()
+            .map(|s| self.compute(s.to_string()))
+            .collect();
 
         let name = func_name
             .replacen("call", "", 1)
@@ -1365,10 +894,7 @@ impl<'a> Executor<'a> {
             .replace("(", "")
             .replace(")", "");
 
-        if let ExecutionMode::Script = self.execution_mode {
-        } else {
-            println!("関数{name}を呼び出します");
-        }
+        self.log_print(format!("{name}関数を呼び出します"));
 
         let code = match self.get_function(name.clone()) {
             Some(func) => func.code,
@@ -1462,10 +988,7 @@ impl<'a> Executor<'a> {
             let address = self.reference_function(func_name.clone()).unwrap_or(0);
             self.name_space[address].code = code.clone();
             self.name_space[address].args = args_value.clone();
-            if let ExecutionMode::Script = self.execution_mode {
-            } else {
-                println!("関数{name}のデータを更新しました");
-            }
+            self.log_print(format!("関数{name}のデータを更新しました"));
         } else {
             //ない場合は新規に確保する
             self.name_space.push(Function {
@@ -1473,10 +996,7 @@ impl<'a> Executor<'a> {
                 args: args_value,
                 code: code,
             });
-            if let ExecutionMode::Script = self.execution_mode {
-            } else {
-                println!("メモリに関数を保存しました");
-            }
+            self.log_print(format!("メモリに関数を保存しました"));
         }
     }
 
@@ -1510,21 +1030,12 @@ impl<'a> Executor<'a> {
         if is_duplicate {
             //　変数が在る場合は更新する
             let address = self.reference_variable(name.clone()).unwrap_or(0);
-            if let ExecutionMode::Script = self.execution_mode {
-            } else {
-                println!("値を求めます");
-            }
+            self.log_print(format!("値を求めます"));
             self.memory[address].value = self.compute(expr.clone());
-            if let ExecutionMode::Script = self.execution_mode {
-            } else {
-                println!("変数{name}のデータを更新しました");
-            }
+            self.log_print(format!("変数{name}のデータを更新しました"));
         } else {
             //ない場合は新規に確保する
-            if let ExecutionMode::Script = self.execution_mode {
-            } else {
-                println!("値を求めます");
-            }
+            self.log_print(format!("値を求めます"));
             if expr.contains("[") && expr.contains("list") {
                 let expr = expr
                     .replacen("list", "", 1)
@@ -1545,10 +1056,7 @@ impl<'a> Executor<'a> {
                     value: value,
                 });
             }
-            if let ExecutionMode::Script = self.execution_mode {
-            } else {
-                println!("メモリに変数を確保しました");
-            }
+            self.log_print(format!("メモリに変数を確保しました"));
         }
     }
 
@@ -1559,10 +1067,7 @@ impl<'a> Executor<'a> {
             Some(i) => i,
             None => {
                 return {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("変数{name}が見つかりません");
-                    }
+                    self.log_print(format!("変数{name}が見つかりません"));
                     None
                 }
             }
@@ -1572,10 +1077,7 @@ impl<'a> Executor<'a> {
 
     /// 変数の値を取得する
     fn get_variable_value(&mut self, name: String) -> Type {
-        if let ExecutionMode::Script = self.execution_mode {
-        } else {
-            println!("変数{name}を読み込みます");
-        }
+        self.log_print(format!("変数{name}を読み込みます"));
         match self.get_variable(name) {
             Some(i) => i.value,
             None => Type::Number(0.0),
@@ -1587,10 +1089,7 @@ impl<'a> Executor<'a> {
         let index = match self.reference_function(name.clone()) {
             Some(i) => i,
             None => {
-                if let ExecutionMode::Script = self.execution_mode {
-                } else {
-                    println!("関数{}が見つかりません", &name);
-                }
+                self.log_print(format!("関数{}が見つかりません", &name));
                 return None;
             }
         };
@@ -1598,7 +1097,7 @@ impl<'a> Executor<'a> {
     }
 
     /// 式の計算
-    fn compute(&mut self, expr: String) -> Type {
+    pub fn compute(&mut self, expr: String) -> Type {
         /// 式をトークンに分ける
         fn tokenize_expression(expr: &str) -> Vec<String> {
             let mut elements = Vec::new();
@@ -1653,10 +1152,7 @@ impl<'a> Executor<'a> {
 
         let tokens: Vec<String> = tokenize_expression(&expr);
         let mut stack: Vec<Type> = Vec::new();
-        if let ExecutionMode::Script = self.execution_mode {
-        } else {
-            println!("+-- 式を計算します");
-        }
+        self.log_print(format!("+-- 式を計算します"));
         for item in tokens {
             let item = item.trim();
             if item.is_empty() {
@@ -1692,76 +1188,38 @@ impl<'a> Executor<'a> {
                 );
             }
 
+            //　入力
+            if item.contains("(") && item.contains("input") {
+                self.log_print(format!("標準ライブラリのinput関数を呼び出します"));
+                stack.push(Type::String(self.input()));
+                continue;
+            }
+
+            // 参照
+            if item.contains("(") && item.contains("ref") {
+                self.log_print(format!("標準ライブラリのref関数を呼び出します"));
+                stack.push(Type::Number(self.refer(item.to_string())));
+                continue;
+            }
+
             // 文字列に変換
             if item.contains("(") && item.contains("string") {
-                stack.push(Type::String(
-                    match self.compute(
-                        item[..item.len() - 1].split("(").collect::<Vec<&str>>()[1..]
-                            .join("(")
-                            .to_string(),
-                    ) {
-                        Type::Number(i) => i.to_string(),
-                        Type::List(l) => l
-                            .iter()
-                            .map(|x| match x {
-                                Type::Number(i) => i.to_string(),
-                                Type::String(s) => format!("'{s}'"),
-                                Type::List(_) => "".to_string(),
-                                Type::Bool(b) => b.to_string(),
-                            })
-                            .collect::<Vec<String>>()
-                            .join(", "),
-                        Type::String(s) => s,
-                        Type::Bool(b) => b.to_string(),
-                    },
-                ));
+                self.log_print(format!("標準ライブラリのstring関数を呼び出します"));
+                stack.push(Type::String(self.string(item.to_string())));
                 continue;
             }
 
             // 数値に変換
             if item.contains("(") && item.contains("number") {
-                stack.push(Type::Number(
-                    match self.compute(
-                        item[..item.len() - 1].split("(").collect::<Vec<&str>>()[1..]
-                            .join("(")
-                            .to_string(),
-                    ) {
-                        Type::Number(i) => i,
-                        Type::List(l) => match &l[0] {
-                            Type::Number(i) => *i,
-                            Type::String(ls) => ls.parse().unwrap_or(0.0),
-                            _ => 0.0,
-                        },
-                        Type::String(s) => s.parse().unwrap_or({
-                            println!("エラー! 変換できませんでした");
-                            0.0
-                        }),
-                        Type::Bool(b) => {
-                            if b {
-                                1.0
-                            } else {
-                                0.0
-                            }
-                        }
-                    },
-                ));
+                self.log_print(format!("標準ライブラリのnumber関数を呼び出します"));
+                stack.push(Type::Number(self.number(item.to_string())));
                 continue;
             }
 
             // 論理値に変換
             if item.contains("(") && item.contains("bool") {
-                stack.push(Type::Bool(
-                    match self.compute(
-                        item[..item.len() - 1].split("(").collect::<Vec<&str>>()[1..]
-                            .join("(")
-                            .to_string(),
-                    ) {
-                        Type::Number(i) => i != 0.0,
-                        Type::List(l) => l.len() != 0,
-                        Type::String(s) => !s.is_empty(),
-                        Type::Bool(b) => b,
-                    },
-                ));
+                self.log_print(format!("標準ライブラリのbool関数を呼び出します"));
+                stack.push(Type::Bool(self.bool(item.to_string())));
                 continue;
             }
 
@@ -1771,18 +1229,7 @@ impl<'a> Executor<'a> {
             }
 
             if item.contains("[") && item.contains("list") {
-                let expr = item
-                    .replacen("list", "", 1)
-                    .replace("[", "")
-                    .replace("]", "");
-                let mut list: Vec<Type> = Vec::new();
-                for i in expr.split(",") {
-                    if i.trim().is_empty() {
-                        continue;
-                    }
-                    list.push(self.compute(i.to_string()))
-                }
-                stack.push(Type::List(list));
+                stack.push(Type::List(self.list(item.to_string())));
                 continue;
             }
 
@@ -1868,10 +1315,9 @@ impl<'a> Executor<'a> {
                                             stack.push(Type::Number(x));
 
                                             stack.push({
-                                                if let ExecutionMode::Script = self.execution_mode {
-                                                } else {
-                                                    println!("ポインタがさす値を求めます");
-                                                }
+                                                self.log_print(format!(
+                                                    "ポインタがさす値を求めます"
+                                                ));
                                                 if y.round() as usize > &self.memory.len() - 1 {
                                                     println!("エラー! アドレスが不正です");
                                                     Type::Number(0.0)
@@ -1943,11 +1389,8 @@ impl<'a> Executor<'a> {
                                     };
 
                                     stack.push({
-                                        if let ExecutionMode::Script = self.execution_mode {
-                                        } else {
-                                            println!("ポインタがさす値を求めます");
-                                        }
-                                        if y.round() as usize > &self.memory.len() - 1 {
+                                        self.log_print(format!("ポインタがさす値を求めます"));
+                                        if y.round() as usize >= self.memory.len() {
                                             println!("エラー! アドレスが不正です");
                                             Type::Number(0.0)
                                         } else {
