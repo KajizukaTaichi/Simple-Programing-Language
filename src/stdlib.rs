@@ -38,18 +38,15 @@ impl<'a> Executor<'a> {
         let inputed = if let ExecutionMode::Script = self.execution_mode {
             input("> ")
         } else {
-            println!("標準入力を受け取ります");
+            self.log_print("標準入力を受け取ります".to_string());
             input("[入力]> ")
         };
         inputed
     }
 
     pub fn string(&mut self, arg: String) -> String {
-        return match self.compute(
-            arg[..arg.len() - 1].split("(").collect::<Vec<&str>>()[1..]
-                .join("(")
-                .to_string(),
-        ) {
+        self.log_print("文字列型に変換します".to_string());
+        return match self.compute(arg) {
             Type::Number(i) => i.to_string(),
             Type::List(l) => l
                 .iter()
@@ -67,21 +64,21 @@ impl<'a> Executor<'a> {
     }
 
     pub fn number(&mut self, arg: String) -> f64 {
-        return match self.compute(
-            arg[..arg.len() - 1].split("(").collect::<Vec<&str>>()[1..]
-                .join("(")
-                .to_string(),
-        ) {
+        self.log_print("数値型に変換します".to_string());
+        return match self.compute(arg) {
             Type::Number(i) => i,
             Type::List(l) => match &l[0] {
                 Type::Number(i) => *i,
                 Type::String(ls) => ls.parse().unwrap_or(0.0),
                 _ => 0.0,
             },
-            Type::String(s) => s.parse().unwrap_or({
-                println!("エラー! 変換できませんでした");
-                0.0
-            }),
+            Type::String(s) => match s.parse() {
+                Ok(i) => i,
+                Err(_) => {
+                    self.log_print("エラー! 変換できませんでした".to_string());
+                    0.0
+                }
+            },
             Type::Bool(b) => {
                 if b {
                     1.0
@@ -93,6 +90,7 @@ impl<'a> Executor<'a> {
     }
 
     pub fn bool(&mut self, arg: String) -> bool {
+        self.log_print("論理型に変換します".to_string());
         match self.compute(
             arg[..arg.len() - 1].split("(").collect::<Vec<&str>>()[1..]
                 .join("(")
@@ -121,18 +119,10 @@ impl<'a> Executor<'a> {
     }
     pub fn refer(&mut self, args: String) -> f64 {
         self.log_print("変数の参照を取得します".to_string());
-        let code = self
-            .tokenize_arguments(
-                args[..args.len() - 1]
-                    .replacen("ref", "", 1)
-                    .replacen("(", "", 1)
-                    .as_str(),
-            )
-            .join(",");
 
-        let address = self.reference_variable(code.clone());
+        let address = self.reference_variable(args.clone());
         if let Some(i) = address {
-            self.log_print(format!("変数{}のアドレスは{}です", code, i));
+            self.log_print(format!("変数{}のアドレスは{}です", args, i));
             i as f64
         } else {
             self.log_print(format!("エラー! 変数が見つかりませんでした"));

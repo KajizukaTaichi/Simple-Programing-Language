@@ -811,6 +811,7 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// 引数のトークンを整える
     pub fn tokenize_arguments(&mut self, expr: &str) -> Vec<String> {
         let mut elements = Vec::new();
         let mut buffer = String::new();
@@ -860,6 +861,45 @@ impl<'a> Executor<'a> {
             elements.push(buffer);
         }
         elements
+    }
+
+    /// 標準ライブラリを呼び出す
+    fn call_stdlib(&mut self, item: String) -> Option<Type> {
+        let params: Vec<&str> = item[..item.len() - 1].split("(").collect();
+        let name = params[0].to_string();
+        let args = self.tokenize_arguments(params[1..].join("(").as_str());
+
+        //　入力
+        if name == "input" {
+            self.log_print(format!("標準ライブラリのinput関数を呼び出します"));
+            return Some(Type::String(self.input()));
+        }
+
+        // 参照
+        if name == "ref" {
+            self.log_print(format!("標準ライブラリのref関数を呼び出します"));
+            return Some(Type::Number(self.refer(args[0].clone())));
+        }
+
+        // 文字列に変換
+        if name == "string" {
+            self.log_print(format!("標準ライブラリのstring関数を呼び出します"));
+            return Some(Type::String(self.string(args[0].clone())));
+        }
+
+        // 数値に変換
+        if name == "number" {
+            self.log_print(format!("標準ライブラリのnumber関数を呼び出します"));
+            return Some(Type::Number(self.number(args[0].clone())));
+        }
+
+        // 論理値に変換
+        if name == "bool" {
+            self.log_print(format!("標準ライブラリのbool関数を呼び出します"));
+            return Some(Type::Bool(self.bool(args[0].clone())));
+        }
+
+        return None;
     }
 
     ///　関数を呼び出す
@@ -1188,43 +1228,11 @@ impl<'a> Executor<'a> {
                 );
             }
 
-            //　入力
-            if item.contains("(") && item.contains("input") {
-                self.log_print(format!("標準ライブラリのinput関数を呼び出します"));
-                stack.push(Type::String(self.input()));
-                continue;
-            }
-
-            // 参照
-            if item.contains("(") && item.contains("ref") {
-                self.log_print(format!("標準ライブラリのref関数を呼び出します"));
-                stack.push(Type::Number(self.refer(item.to_string())));
-                continue;
-            }
-
-            // 文字列に変換
-            if item.contains("(") && item.contains("string") {
-                self.log_print(format!("標準ライブラリのstring関数を呼び出します"));
-                stack.push(Type::String(self.string(item.to_string())));
-                continue;
-            }
-
-            // 数値に変換
-            if item.contains("(") && item.contains("number") {
-                self.log_print(format!("標準ライブラリのnumber関数を呼び出します"));
-                stack.push(Type::Number(self.number(item.to_string())));
-                continue;
-            }
-
-            // 論理値に変換
-            if item.contains("(") && item.contains("bool") {
-                self.log_print(format!("標準ライブラリのbool関数を呼び出します"));
-                stack.push(Type::Bool(self.bool(item.to_string())));
-                continue;
-            }
-
             if item.contains("(") {
-                stack.push(self.call_function(item.to_string()));
+                match self.call_stdlib(item.to_string()) {
+                    Some(i) => stack.push(i),
+                    None => stack.push(self.call_function(item.to_string())),
+                }
                 continue;
             }
 

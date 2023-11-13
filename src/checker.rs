@@ -68,7 +68,6 @@ impl<'a> Executor<'a> {
 
                 ControlMode::Else => {
                     if code.contains("end if") {
-                        
                         if self.nest_if > 0 {
                             self.nest_if -= 1;
                             self.else_stmt.push(code.to_string());
@@ -93,7 +92,6 @@ impl<'a> Executor<'a> {
                             self.stmt = Vec::new();
                         }
                     } else if code.contains("if") {
-                        
                         self.nest_if += 1;
                         self.else_stmt.push(code.to_string());
                     } else {
@@ -102,7 +100,6 @@ impl<'a> Executor<'a> {
                 }
                 ControlMode::While => {
                     if code.contains("end while") {
-                        
                         if self.nest_while > 0 {
                             self.nest_while -= 1;
                             self.stmt.push(code.to_string());
@@ -116,7 +113,6 @@ impl<'a> Executor<'a> {
                             .check(self.stmt.clone());
                         }
                     } else if code.contains("while") {
-                        
                         self.nest_while += 1;
                         self.stmt.push(code.to_string());
                     } else {
@@ -141,7 +137,7 @@ impl<'a> Executor<'a> {
                         }
                     } else if code.contains("func") {
                         self.nest_func += 1;
-                        
+
                         self.stmt.push(code.to_string());
                     } else {
                         self.stmt.push(code.to_string());
