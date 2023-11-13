@@ -1,7 +1,10 @@
 use std::env;
 use std::fs::File;
 use std::io::{Error, Read};
-mod executor;
+
+mod checker; //構文チェッカー
+mod executor; //実行処理
+mod stdlib; // 標準ライブラリ
 
 #[cfg(test)]
 mod tests; //テストモジュールを読み込む
@@ -14,19 +17,20 @@ fn get_file_contents(name: String) -> Result<String, Error> {
     Ok(contents)
 }
 
+/// タイトルを表示する
 fn title(msg: String) {
-    println!(" OOOOOO   OO                           OO         ");
-    println!("OO   OOO      OO           OO OOOOO    OO   OOOOO ");
-    println!("OOO       OO  OOOOO OOOO   OOOO   OOO  OO  OO   OO");
-    println!(" OOOOOO   OO  OOO OOO OOO  OOO     OO  OO  OOOOOO ");
-    println!("     OOO  OO  OO   OO  OO  OOOO   OOO  OO  OO     ");
-    println!("OOO   OO  OO  OO   OO  OO  OO OOOOO    OO  OO   OO");
-    println!(" OOOOOO   OO  OO   OO  OO  OO          OOO  OOOOO \n");
+    println!(" OOOOOOO    OO                                  OO             ");
+    println!("OO     OO        OO OOOO  OOOOO    OO OOOOOO    OO     OOOOOO  ");
+    println!("OO         OOO   OOO    OOO   OO   OOO     OO   OO    OO    OO ");
+    println!(" OOOOOOO    OO   OO     OO    OO   OOO     OO   OO    OOOOOOO  ");
+    println!("       OO   OO   OO     OO    OO   OO OOOOOO    OO    OO       ");
+    println!("OO     OO   OO   OO     OO    OO   OO           OO    OO    OO ");
+    println!(" OOOOOOO    OO   OO     OO    OO   OO           OOOO   OOOOOO  \n");
     println!("コンピュータの動作原理を学ぶ新しい教育用プログラミング言語");
     println!("(c) 2023 梶塚太智. All rights reserved\n");
 
     println!("{msg}");
-    println!("============================================================");
+    println!("--------------------------------------------------------------------");
 }
 
 fn main() {
