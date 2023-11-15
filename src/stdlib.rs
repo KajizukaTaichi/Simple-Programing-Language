@@ -129,4 +129,14 @@ impl<'a> Executor<'a> {
             0.0
         }
     }
+
+    pub fn access(&mut self, args: f64) -> Type {
+        self.log_print(format!("メモリアドレス{args}の指す値を求めます"));
+        if args.round() as usize > &self.memory.len() - 1 {
+            println!("エラー! アドレスが有効範囲外です");
+            Type::Number(0.0)
+        } else {
+            self.memory[args.round() as usize].value.clone()
+        }
+    }
 }

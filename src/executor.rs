@@ -22,7 +22,7 @@ pub enum Type {
 #[derive(Clone)]
 pub struct Variable {
     name: String,
-    value: Type,
+    pub value: Type,
 }
 
 /// 関数のデータ
@@ -881,6 +881,12 @@ impl<'a> Executor<'a> {
             return Some(Type::Number(self.refer(args[0].clone())));
         }
 
+        if name == "access" {
+            self.log_print(format!("標準ライブラリのaccess関数を呼び出します"));
+            let address = self.number(args[0].clone());
+            return Some(self.access(address));
+        }
+
         // 文字列に変換
         if name == "string" {
             self.log_print(format!("標準ライブラリのstring関数を呼び出します"));
@@ -934,7 +940,7 @@ impl<'a> Executor<'a> {
             .replace("(", "")
             .replace(")", "");
 
-        self.log_print(format!("{name}関数を呼び出します"));
+        self.log_print(format!("関数{name}を呼び出します"));
 
         let code = match self.get_function(name.clone()) {
             Some(func) => func.code,
