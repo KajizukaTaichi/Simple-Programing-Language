@@ -130,13 +130,17 @@ impl<'a> Executor<'a> {
         }
     }
 
-    pub fn access(&mut self, args: f64) -> Type {
+    pub fn access(&mut self, args: String) -> Type {
+        let address = match self.compute(args.clone()) {
+            Type::Number(n) => n,
+            _ => 0.0,
+        };
         self.log_print(format!("メモリアドレス{args}の指す値を求めます"));
-        if args.round() as usize > &self.memory.len() - 1 {
+        if address.round() as usize > &self.memory.len() - 1 {
             println!("エラー! アドレスが有効範囲外です");
             Type::Number(0.0)
         } else {
-            self.memory[args.round() as usize].value.clone()
+            self.memory[address.round() as usize].value.clone()
         }
     }
 }

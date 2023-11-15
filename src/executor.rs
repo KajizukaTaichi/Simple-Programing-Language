@@ -887,8 +887,7 @@ impl<'a> Executor<'a> {
 
         if name == "access" {
             self.log_print(format!("標準ライブラリのaccess関数を呼び出します"));
-            let address = self.number(args[0].clone());
-            return Some(self.access(address));
+            return Some(self.access(args[0].clone()));
         }
 
         // 文字列に変換
@@ -1197,7 +1196,6 @@ impl<'a> Executor<'a> {
             if !buffer.is_empty() {
                 elements.push(buffer);
             }
-            dbg!(elements.clone());
             elements
         }
 
