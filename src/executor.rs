@@ -867,7 +867,11 @@ impl<'a> Executor<'a> {
     fn call_stdlib(&mut self, item: String) -> Option<Type> {
         let params: Vec<&str> = item[..item.len() - 1].split("(").collect();
         let name = params[0].to_string();
-        let args = self.tokenize_arguments(params[1..].join("(").as_str());
+        let mut args = self.tokenize_arguments(params[1..].join("(").as_str());
+
+        if args.len() == 0 {
+            args.push("".to_string());
+        }
 
         //　入力
         if name == "input" {
@@ -1193,6 +1197,7 @@ impl<'a> Executor<'a> {
             if !buffer.is_empty() {
                 elements.push(buffer);
             }
+            dbg!(elements.clone());
             elements
         }
 
@@ -1234,7 +1239,7 @@ impl<'a> Executor<'a> {
                 );
             }
 
-            if item.contains("(") {
+            if item.contains("(") && item.contains(")") {
                 match self.call_stdlib(item.to_string()) {
                     Some(i) => stack.push(i),
                     None => stack.push(self.call_function(item.to_string())),
