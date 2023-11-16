@@ -4,7 +4,8 @@ Simpleは子ども達が楽しくプログラミングしながらコンピュ�
 
 このSimpleの教育用プログラミング言語として普及を目指しています。
 
-![image](https://github.com/KajizukaTaichi/Simple-Programing-Language/assets/122075081/ac25ed32-a61b-473f-98d8-b11e7fbbfe10)
+![image](https://github.com/KajizukaTaichi/Simple-Programing-Language/assets/122075081/0fc663c7-ae26-4a32-afa0-b2bc628ad0f1)
+
 
 
 ☝対話的にプログラミングしている画像
