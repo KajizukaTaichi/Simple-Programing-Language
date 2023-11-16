@@ -738,6 +738,7 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// リストの値をセットする
     fn set_list_value(&mut self, item: String, value: Type) {
         let new_lines: Vec<String> = item
             .trim()
@@ -770,6 +771,7 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// リストの値を削除する
     fn del_list_value(&mut self, item: String) {
         let new_lines: Vec<String> = item
             .trim()
@@ -959,7 +961,7 @@ impl<'a> Executor<'a> {
                 }
                 Type::Number(f) => pre.push(format!("var {i} = {f}")),
                 Type::List(l) => pre.push(format!(
-                    "var {i} = list[{}]",
+                    "var {i} = [{}]",
                     l.iter()
                         .map(|x| match x {
                             Type::Number(i) => i.to_string(),
@@ -1201,7 +1203,7 @@ impl<'a> Executor<'a> {
                             Type::String(s) => format!("'{s}'"),
                             Type::Number(i) => format!("{}", i.to_string()),
                             Type::List(l) => format!(
-                                "list[{}]",
+                                "[{}]",
                                 l.iter()
                                     .map(|x| match x {
                                         Type::Number(i) => i.to_string(),
@@ -1246,7 +1248,6 @@ impl<'a> Executor<'a> {
                                 None => Type::Number(0.0),
                             };
 
-                            // リストの値を得る
                             // リストの値を得る
                             if item.contains("[") && item.contains("]") {
                                 stack.push(x);
@@ -1444,7 +1445,7 @@ impl<'a> Executor<'a> {
                     Type::String(ref s) => format!("'{s}'"),
                     Type::Number(i) => format!("{i}"),
                     Type::List(l) => format!(
-                        "list[{}]",
+                        "[{}]",
                         l.iter()
                             .map(|x| match x {
                                 Type::Number(i) => i.to_string(),

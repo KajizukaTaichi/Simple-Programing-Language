@@ -104,11 +104,8 @@ impl<'a> Executor<'a> {
     }
 
     pub fn list(&mut self, arg: String) -> Vec<Type> {
-        let expr = arg[..arg.len() - 1]
-            .replacen("list", "", 1)
-            .replacen("(", "", 1);
         let mut list: Vec<Type> = Vec::new();
-        for i in self.tokenize_arguments(expr.as_str()) {
+        for i in self.tokenize_arguments(arg.as_str()) {
             if i.trim().is_empty() {
                 continue;
             }
