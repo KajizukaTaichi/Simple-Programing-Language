@@ -1196,7 +1196,7 @@ impl<'a> Executor<'a> {
             } else {
                 // スタック内部を表示
                 println!(
-                    "| Stack【 {} 】 ←  {}",
+                    "| Stack〔{} 〕←  {}",
                     stack
                         .iter()
                         .map(|x| match x {
