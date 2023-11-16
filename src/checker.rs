@@ -153,13 +153,13 @@ impl<'a> Executor<'a> {
                         }
                     } else if code.contains("func") {
                         //　関数の定義
-                        if !code.contains("(") {
+                        if !code.contains("(") || !code.contains(")") {
                             println!("エラー! 関数にはカッコをつけてください");
                         }
                         self.control_mode = ControlMode::Function;
                     } else if code.contains("call") {
                         // 関数呼び出し
-                        if !code.contains("(") {
+                        if !code.contains("(") || !code.contains(")") {
                             println!("エラー! 関数にはカッコをつけてください");
                         }
                     } else if code.contains("for") {
@@ -168,13 +168,6 @@ impl<'a> Executor<'a> {
                         self.control_mode = ControlMode::If
                     } else if code.contains("while") {
                         self.control_mode = ControlMode::While;
-                    } else if code.contains("rand") {
-                        // 乱数
-                        let new_code = code.replacen("rand", "", 1);
-                        let params = new_code.split(",").collect::<Vec<&str>>();
-                        if params.len() < 3 {
-                            println!("エラー! rand分には3つに引数が必要です");
-                        }
                     } else {
                         if let ExecutionMode::Script = self.execution_mode {
                         } else {

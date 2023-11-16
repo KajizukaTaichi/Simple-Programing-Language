@@ -104,12 +104,11 @@ impl<'a> Executor<'a> {
     }
 
     pub fn list(&mut self, arg: String) -> Vec<Type> {
-        let expr = arg
+        let expr = arg[..arg.len() - 1]
             .replacen("list", "", 1)
-            .replace("[", "")
-            .replace("]", "");
+            .replacen("(", "", 1);
         let mut list: Vec<Type> = Vec::new();
-        for i in expr.split(",") {
+        for i in self.tokenize_arguments(expr.as_str()) {
             if i.trim().is_empty() {
                 continue;
             }
@@ -117,6 +116,7 @@ impl<'a> Executor<'a> {
         }
         return list;
     }
+
     pub fn refer(&mut self, args: String) -> f64 {
         self.log_print("変数の参照を取得します".to_string());
 
@@ -135,7 +135,7 @@ impl<'a> Executor<'a> {
             Type::Number(n) => n,
             _ => 0.0,
         };
-        self.log_print(format!("メモリアドレス{args}の指す値を求めます"));
+        self.log_print(format!("メモリアドレス{address}の指す値を求めます"));
         if address.round() as usize > &self.memory.len() - 1 {
             println!("エラー! アドレスが有効範囲外です");
             Type::Number(0.0)
