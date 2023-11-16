@@ -1,21 +1,18 @@
-var true = 1.0　#論理値を設定する
-var false = 0.0
-
 func prime(ptr)
     #素数かどうか判定する関数
     #引数はポインタ
     
-    if ptr ~ 2 <
+    if access(ptr) 2 <
         return false
     end if　#2未満は素数ではない
 
-    if ptr ~ 4 <
+    if access(ptr) 4 <
         return true
     end if　#2以上4未満は素数
 
     var count = 2
-    while count ptr ~ 0.5 ^ <
-        if ptr ~ count % 0 =
+    while count access(ptr) 0.5 ^ <
+        if access(ptr) count % 0 =
             return false
         end if #割れるか確かめる
         var count = count 1 +
@@ -29,14 +26,14 @@ print'Build on Simple programing language'
 
 while true
     #無限に入力を受け付ける
-    input number
+    var num = number(input())
 
-    if number false =　
+    if num 0 =　
         print'終了します'
         break
     end if
 
-    ref ptr = number #numberの参照
+    var ptr = ref(num) #numの参照
     
     #prime関数を呼び出す
     if prime(ptr) true =
@@ -45,6 +42,5 @@ while true
         var text = 'は素数ではありません'
     end if
     
-    print ptr ~, text
+    print string(access(ptr)) text +
 end while
-　
