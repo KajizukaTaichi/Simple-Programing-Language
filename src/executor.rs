@@ -888,7 +888,7 @@ impl<'a> Executor<'a> {
         let params: Vec<&str> = item[..item.len() - 1].split("(").collect();
         let name = params[0].to_string();
         let mut args = self.tokenize_arguments(params[1..].join("(").as_str());
-
+    
         if args.len() == 0 {
             args.push("".to_string());
         }
@@ -986,7 +986,7 @@ impl<'a> Executor<'a> {
                 }
                 Type::Number(f) => pre.push(format!("var {i} = {f}")),
                 Type::List(l) => pre.push(format!(
-                    "var {i} = [{}]",
+                    "var {i} = list({})",
                     l.iter()
                         .map(|x| match x {
                             Type::Number(i) => i.to_string(),
