@@ -709,22 +709,22 @@ impl<'a> Executor<'a> {
 
     /// リストの値を得る
     fn get_list_value(&mut self, item: Type, index: String) -> Type {
-        if let Type::List(ref l) = item {
+        if let Type::List(ref list) = item {
             let index = if let Type::Number(i) = self.compute(index.clone()) {
                 let j = i as usize;
                 self.log_print(format!("インデックス{i}の値を求めます"));
-                if j < l.len() {
+                if j < list.len() {
                     j
                 } else {
                     self.log_print(format!("エラー! {i}はインデックス範囲外です"));
                     return Type::Number(0.0);
                 }
             } else {
-                if let Type::String(s) = self.compute(index.clone()) {
-                    self.log_print(format!("長さを求めます"));
-                    if s.contains("len") {
-                        if let Type::List(d) = item {
-                            return Type::Number(d.clone().len() as f64);
+                if let Type::String(is) = self.compute(index.clone()) {
+                    self.log_print(format!("リストの長さを求めます"));
+                    if is.contains("len") {
+                        if let Type::List(l) = item {
+                            return Type::Number(l.clone().len() as f64);
                         }
                     }
                 }
@@ -732,7 +732,32 @@ impl<'a> Executor<'a> {
                 self.log_print(format!("エラー! インデックスは数値型です"));
                 return Type::Number(0.0);
             };
-            return l[index].clone();
+            return list[index].clone();
+        }
+        if let Type::String(ref string) = item {
+            let index: usize = if let Type::Number(i) = self.compute(index.clone()) {
+                let j: usize = i as usize;
+                self.log_print(format!("{string}の{i}文字目を求めます"));
+                if j < string.chars().count() {
+                    j
+                } else {
+                    self.log_print(format!("エラー! {i}はインデックス範囲外です"));
+                    return Type::Number(0.0);
+                }
+            } else {
+                if let Type::String(is) = self.compute(index.clone()) {
+                    self.log_print(format!("文字列の長さを求めます"));
+                    if is.contains("len") {
+                        if let Type::String(m) = item {
+                            return Type::Number(m.clone().len() as f64);
+                        }
+                    }
+                }
+
+                self.log_print(format!("エラー! インデックスは数値型です"));
+                return Type::Number(0.0);
+            };
+            return Type::String(string.chars().collect::<Vec<char>>()[index].to_string());
         } else {
             return self.compute(index.clone());
         }
