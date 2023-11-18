@@ -737,7 +737,7 @@ impl<'a> Executor<'a> {
         if let Type::String(ref string) = item {
             let index: usize = if let Type::Number(i) = self.compute(index.clone()) {
                 let j: usize = i as usize;
-                self.log_print(format!("{string}の{i}文字目を求めます"));
+                self.log_print(format!("のインデックス{i}の値を求めます"));
                 if j < string.chars().count() {
                     j
                 } else {
@@ -772,27 +772,63 @@ impl<'a> Executor<'a> {
             .map(|s| s.to_string())
             .collect();
         let name: String = new_lines[0].trim().to_string();
-        if let Type::List(mut l) = self.get_variable_value(name.clone()) {
-            let len = l.len();
-            l[if let Type::Number(i) = self.compute(new_lines[1].clone()) {
-                let j = i as usize;
-                self.log_print(format!("インデックス{i}の値を変更します"));
-                if j < len {
-                    j
-                } else {
-                    if let ExecutionMode::Script = self.execution_mode {
+        let address = self.reference_variable(name.clone()).unwrap_or(0);
+        let index = self.compute(new_lines[1].clone());
+
+        match self.get_variable_value(name.clone()) {
+            Type::List(mut list) => {
+                let len = list.len();
+                list[if let Type::Number(i) = index {
+                    let i = i as usize;
+                    self.log_print(format!("インデックス{i}の値を変更します"));
+                    if i < len {
+                        i
                     } else {
-                        println!("エラー! {i}はインデックス範囲外です");
+                        self.log_print(format!("エラー! {i}はインデックス範囲外です"));
                         return;
-                    };
+                    }
+                } else {
+                    self.log_print(format!("エラー! インデックスは数値型です"));
                     0
-                }
-            } else {
-                self.log_print(format!("エラー! インデックスは数値型です"));
-                0
-            }] = value;
-            let address = self.reference_variable(name.clone()).unwrap_or(0);
-            self.memory[address].value = Type::List(l);
+                }] = value.clone();
+                self.memory[address].value = Type::List(list);
+            }
+            Type::String(string) => {
+                let mut vec = string
+                    .chars()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>();
+                vec[if let Type::Number(i) = index {
+                    let i: usize = i as usize;
+                    self.log_print(format!("{string}のインデックス{i}の値を変更します"));
+                    if i < string.chars().count() {
+                        i
+                    } else {
+                        self.log_print(format!("エラー! {i}はインデックス範囲外です"));
+                        0
+                    }
+                } else {
+                    0
+                }] = match value {
+                    Type::String(ref s) => format!("{s}"),
+                    Type::Number(i) => format!("{i}"),
+                    Type::List(l) => format!(
+                        "[{}]",
+                        l.iter()
+                            .map(|x| match x {
+                                Type::Number(i) => i.to_string(),
+                                Type::String(s) => format!("'{s}'"),
+                                Type::List(_) => "".to_string(),
+                                Type::Bool(b) => b.to_string(),
+                            })
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    ),
+                    Type::Bool(b) => b.to_string(),
+                };
+                self.memory[address].value = Type::String(vec.join(""));
+            }
+            _ => self.log_print(format!("エラー! スライスは文字列型やリスト型のみ有効です")),
         }
     }
 
@@ -805,9 +841,9 @@ impl<'a> Executor<'a> {
             .map(|s| s.to_string())
             .collect();
         let name: String = new_lines[0].trim().to_string();
-        if let Type::List(mut l) = self.get_variable_value(name.clone()) {
-            let len = l.len();
-            l.remove(
+        if let Type::List(mut list) = self.get_variable_value(name.clone()) {
+            let len = list.len();
+            list.remove(
                 if let Type::Number(i) = self.compute(new_lines[1].clone()) {
                     let j = i as usize;
                     self.log_print(format!("インデックス{i}の値を削除します"));
@@ -827,7 +863,31 @@ impl<'a> Executor<'a> {
                 },
             );
             let address = self.reference_variable(name.clone()).unwrap_or(0);
-            self.memory[address].value = Type::List(l);
+            self.memory[address].value = Type::List(list);
+        }
+        if let Type::String(mut string) = self.get_variable_value(name.clone()) {
+            let len = string.len();
+            string.remove(
+                if let Type::Number(i) = self.compute(new_lines[1].clone()) {
+                    let j = i as usize;
+                    self.log_print(format!("インデックス{i}の値を削除します"));
+                    if j < len {
+                        j
+                    } else {
+                        if let ExecutionMode::Script = self.execution_mode {
+                        } else {
+                            println!("エラー! {i}はインデックス範囲外です");
+                            return;
+                        };
+                        0
+                    }
+                } else {
+                    self.log_print(format!("エラー! インデックスは数値型です"));
+                    return;
+                },
+            );
+            let address = self.reference_variable(name.clone()).unwrap_or(0);
+            self.memory[address].value = Type::String(string);
         }
     }
 
@@ -888,7 +948,7 @@ impl<'a> Executor<'a> {
         let params: Vec<&str> = item[..item.len() - 1].split("(").collect();
         let name = params[0].to_string();
         let mut args = self.tokenize_arguments(params[1..].join("(").as_str());
-    
+
         if args.len() == 0 {
             args.push("".to_string());
         }
