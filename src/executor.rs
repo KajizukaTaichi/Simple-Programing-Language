@@ -865,9 +865,13 @@ impl<'a> Executor<'a> {
             let address = self.reference_variable(name.clone()).unwrap_or(0);
             self.memory[address].value = Type::List(list);
         }
-        if let Type::String(mut string) = self.get_variable_value(name.clone()) {
+        if let Type::String(string) = self.get_variable_value(name.clone()) {
             let len = string.len();
-            string.remove(
+            let mut vec = string
+                    .chars()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>();
+            vec.remove(
                 if let Type::Number(i) = self.compute(new_lines[1].clone()) {
                     let j = i as usize;
                     self.log_print(format!("インデックス{i}の値を削除します"));
@@ -887,7 +891,7 @@ impl<'a> Executor<'a> {
                 },
             );
             let address = self.reference_variable(name.clone()).unwrap_or(0);
-            self.memory[address].value = Type::String(string);
+            self.memory[address].value = Type::String(vec.join(""));
         }
     }
 
