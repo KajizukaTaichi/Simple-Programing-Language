@@ -327,7 +327,7 @@ impl<'a> Executor<'a> {
                     let expr = params[1..].join("=").to_string();
                     if name.contains("[") {
                         let value = self.compute(expr);
-                        self.set_list_value(name.to_string(), value);
+                        self.set_sequence_value(name.to_string(), value);
                     } else {
                         let name = name.replace(" ", "");
                         self.log_print(format!("変数{}を定義します", name));
@@ -387,7 +387,7 @@ impl<'a> Executor<'a> {
                         }
                     } else {
                         if name.contains("[") {
-                            self.del_list_value(name.to_string());
+                            self.del_sequence_value(name.to_string());
                         } else {
                             match self.reference_variable(name.clone()) {
                                 Some(index) => {
@@ -708,12 +708,12 @@ impl<'a> Executor<'a> {
     }
 
     /// リストの値を得る
-    fn get_list_value(&mut self, item: Type, index: String) -> Type {
-        if let Type::List(ref list) = item {
+    fn get_sequence_value(&mut self, item: Type, index: String) -> Type {
+        if let Type::List(ref sequence) = item {
             let index = if let Type::Number(i) = self.compute(index.clone()) {
                 let j = i as usize;
                 self.log_print(format!("インデックス{i}の値を求めます"));
-                if j < list.len() {
+                if j < sequence.len() {
                     j
                 } else {
                     self.log_print(format!("エラー! {i}はインデックス範囲外です"));
@@ -732,12 +732,12 @@ impl<'a> Executor<'a> {
                 self.log_print(format!("エラー! インデックスは数値型です"));
                 return Type::Number(0.0);
             };
-            return list[index].clone();
+            return sequence[index].clone();
         }
         if let Type::String(ref string) = item {
             let index: usize = if let Type::Number(i) = self.compute(index.clone()) {
                 let j: usize = i as usize;
-                self.log_print(format!("のインデックス{i}の値を求めます"));
+                self.log_print(format!("'{string}'のインデックス{i}の値を求めます"));
                 if j < string.chars().count() {
                     j
                 } else {
@@ -764,7 +764,7 @@ impl<'a> Executor<'a> {
     }
 
     /// リストの値をセットする
-    fn set_list_value(&mut self, item: String, value: Type) {
+    fn set_sequence_value(&mut self, item: String, value: Type) {
         let new_lines: Vec<String> = item
             .trim()
             .replace("]", "")
@@ -776,9 +776,9 @@ impl<'a> Executor<'a> {
         let index = self.compute(new_lines[1].clone());
 
         match self.get_variable_value(name.clone()) {
-            Type::List(mut list) => {
-                let len = list.len();
-                list[if let Type::Number(i) = index {
+            Type::List(mut sequence) => {
+                let len = sequence.len();
+                sequence[if let Type::Number(i) = index {
                     let i = i as usize;
                     self.log_print(format!("インデックス{i}の値を変更します"));
                     if i < len {
@@ -791,7 +791,7 @@ impl<'a> Executor<'a> {
                     self.log_print(format!("エラー! インデックスは数値型です"));
                     0
                 }] = value.clone();
-                self.memory[address].value = Type::List(list);
+                self.memory[address].value = Type::List(sequence);
             }
             Type::String(string) => {
                 let mut vec = string
@@ -800,7 +800,7 @@ impl<'a> Executor<'a> {
                     .collect::<Vec<String>>();
                 vec[if let Type::Number(i) = index {
                     let i: usize = i as usize;
-                    self.log_print(format!("{string}のインデックス{i}の値を変更します"));
+                    self.log_print(format!("'{string}'のインデックス{i}の値を変更します"));
                     if i < string.chars().count() {
                         i
                     } else {
@@ -833,7 +833,7 @@ impl<'a> Executor<'a> {
     }
 
     /// リストの値を削除する
-    fn del_list_value(&mut self, item: String) {
+    fn del_sequence_value(&mut self, item: String) {
         let new_lines: Vec<String> = item
             .trim()
             .replace("]", "")
@@ -841,9 +841,9 @@ impl<'a> Executor<'a> {
             .map(|s| s.to_string())
             .collect();
         let name: String = new_lines[0].trim().to_string();
-        if let Type::List(mut list) = self.get_variable_value(name.clone()) {
-            let len = list.len();
-            list.remove(
+        if let Type::List(mut sequence) = self.get_variable_value(name.clone()) {
+            let len = sequence.len();
+            sequence.remove(
                 if let Type::Number(i) = self.compute(new_lines[1].clone()) {
                     let j = i as usize;
                     self.log_print(format!("インデックス{i}の値を削除します"));
@@ -863,14 +863,14 @@ impl<'a> Executor<'a> {
                 },
             );
             let address = self.reference_variable(name.clone()).unwrap_or(0);
-            self.memory[address].value = Type::List(list);
+            self.memory[address].value = Type::List(sequence);
         }
         if let Type::String(string) = self.get_variable_value(name.clone()) {
             let len = string.len();
             let mut vec = string
-                    .chars()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>();
+                .chars()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>();
             vec.remove(
                 if let Type::Number(i) = self.compute(new_lines[1].clone()) {
                     let j = i as usize;
@@ -1050,7 +1050,7 @@ impl<'a> Executor<'a> {
                 }
                 Type::Number(f) => pre.push(format!("var {i} = {f}")),
                 Type::List(l) => pre.push(format!(
-                    "var {i} = list({})",
+                    "var {i} = sequence({})",
                     l.iter()
                         .map(|x| match x {
                             Type::Number(i) => i.to_string(),
@@ -1341,7 +1341,7 @@ impl<'a> Executor<'a> {
                             if item.contains("[") && item.contains("]") {
                                 stack.push(x);
                                 stack.push(
-                                    self.get_list_value(
+                                    self.get_sequence_value(
                                         y,
                                         item[..item.len() - 1]
                                             .to_string()
@@ -1462,7 +1462,7 @@ impl<'a> Executor<'a> {
                             // リストの値を得る
                             if item.contains("[") && item.contains("]") {
                                 stack.push(
-                                    self.get_list_value(
+                                    self.get_sequence_value(
                                         y,
                                         item[..item.len() - 1]
                                             .to_string()
