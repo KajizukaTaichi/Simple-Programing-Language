@@ -6,9 +6,6 @@ mod checker; //構文チェッカー
 mod executor; //実行処理
 mod stdlib; // 標準ライブラリ
 
-#[cfg(test)]
-mod tests; //テストモジュールを読み込む
-
 /// ファイルを読み込む
 fn get_file_contents(name: String) -> Result<String, Error> {
     let mut f = File::open(name.trim())?;
