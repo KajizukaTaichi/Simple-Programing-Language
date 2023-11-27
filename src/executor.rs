@@ -717,7 +717,7 @@ impl<'a> Executor<'a> {
                     self.log_print(format!("文字列の長さを求めます"));
                     if is.contains("len") {
                         if let Type::String(m) = item {
-                            return Type::Number(m.clone().len() as f64);
+                            return Type::Number(m.clone().chars().count() as f64);
                         }
                     }
                 }
