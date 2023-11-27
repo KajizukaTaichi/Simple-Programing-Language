@@ -705,7 +705,7 @@ impl<'a> Executor<'a> {
         if let Type::String(ref string) = item {
             let index: usize = if let Type::Number(i) = self.compute(index.clone()) {
                 let j: usize = i as usize;
-                self.log_print(format!("'{string}'のインデックス{i}の値を求めます"));
+                self.log_print(format!("'{string}'のインデックス{i}の文字を求めます"));
                 if j < string.chars().count() {
                     j
                 } else {
