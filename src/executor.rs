@@ -618,7 +618,7 @@ impl<'a> Executor<'a> {
         }
     }
 
-    fn show_memory(&self) {
+    fn show_memory(&mut self) {
         let mut name_max_len = 0;
         for i in self.memory.iter() {
             if name_max_len < i.name.len() {
@@ -637,43 +637,11 @@ impl<'a> Executor<'a> {
 
         if !self.memory.is_empty() {
             self.log_print(format!("+-- メモリ内の変数"));
-            for index in 0..self.memory.len() {
-                let vars = &self.memory[index];
-                match &vars.value {
-                    Type::Number(i) => {
-                        println!(
-                            "| [{:>3}] {:<name_max_len$} : {:>value_max_len$} ",
-                            index, vars.name, i
-                        )
-                    }
-                    Type::String(s) => {
-                        println!("| [{:>3}] {:<name_max_len$} : '{}' ", index, vars.name, s)
-                    }
-                    Type::List(l) => {
-                        print!("| [{:>3}] {:<name_max_len$} : [", index, vars.name);
-
-                        for i in l {
-                            match i {
-                                Type::Number(i) => {
-                                    print!("{:>value_max_len$}, ", i)
-                                }
-                                Type::String(s) => {
-                                    print!("'{}' , ", s)
-                                }
-                                _ => {}
-                            }
-                        }
-                        println!("]");
-                    }
-                    Type::Bool(b) => {
-                        println!(
-                            "| [{:>3}] {:<name_max_len$} : {}",
-                            index,
-                            vars.name,
-                            &b.to_string()
-                        );
-                    }
-                }
+            let len = self.memory.len();
+            for index in 0..len {
+                let vars = self.memory[index].clone();
+                let value  = self.type_string(vars.value.clone());
+                println!("| [{:>3}] {:<name_max_len$} :{}",index, vars.name, value);
             }
         } else {
             self.log_print(format!("変数がありません"));
@@ -1219,6 +1187,22 @@ impl<'a> Executor<'a> {
         return Some(self.name_space[index].clone());
     }
 
+    /// 型の文字列表記
+    fn type_string(&mut self, data: Type) -> String {
+        match data {
+            Type::String(s) => format!("'{s}'"),
+            Type::Number(i) => format!("{}", i.to_string()),
+            Type::List(l) => format!(
+                "[{}]",
+                l.into_iter()
+                    .map(|x| self.type_string(x))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Type::Bool(b) => b.to_string(),
+        }
+    }
+
     /// 式の計算
     pub fn compute(&mut self, expr: String) -> Type {
         /// 式をトークンに分ける
@@ -1288,23 +1272,7 @@ impl<'a> Executor<'a> {
                     "| Stack〔{} 〕←  {}",
                     stack
                         .iter()
-                        .map(|x| match x {
-                            Type::String(s) => format!("'{s}'"),
-                            Type::Number(i) => format!("{}", i.to_string()),
-                            Type::List(l) => format!(
-                                "[{}]",
-                                l.iter()
-                                    .map(|x| match x {
-                                        Type::Number(i) => i.to_string(),
-                                        Type::String(s) => format!("'{s}'"),
-                                        Type::List(_) => "".to_string(),
-                                        Type::Bool(b) => b.to_string(),
-                                    })
-                                    .collect::<Vec<String>>()
-                                    .join(", ")
-                            ),
-                            Type::Bool(b) => b.to_string(),
-                        })
+                        .map(|x| self.type_string(x.clone()))
                         .collect::<Vec<String>>()
                         .join(", "),
                     item
@@ -1528,26 +1496,7 @@ impl<'a> Executor<'a> {
 
         if let ExecutionMode::Script = self.execution_mode {
         } else {
-            println!(
-                "結果 = {}",
-                match result.clone() {
-                    Type::String(ref s) => format!("'{s}'"),
-                    Type::Number(i) => format!("{i}"),
-                    Type::List(l) => format!(
-                        "[{}]",
-                        l.iter()
-                            .map(|x| match x {
-                                Type::Number(i) => i.to_string(),
-                                Type::String(s) => format!("'{s}'"),
-                                Type::List(_) => "".to_string(),
-                                Type::Bool(b) => b.to_string(),
-                            })
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    ),
-                    Type::Bool(b) => b.to_string(),
-                }
-            );
+            println!("結果 = {}", self.type_string(result.clone()))
         }
         return result;
     }
