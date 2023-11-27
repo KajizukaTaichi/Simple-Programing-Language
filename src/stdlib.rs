@@ -4,28 +4,11 @@ impl<'a> Executor<'a> {
     pub fn print(&mut self, arg: String) {
         let mut text = String::new();
         self.log_print(format!("標準出力に表示します"));
-        match self.compute(arg.trim().to_string()) {
-            Type::Number(i) => {
-                text += i.to_string().as_str();
-            }
-            Type::String(s) => {
-                text += s.replace("'", "").replace('"', "").as_str();
-            }
-            Type::List(l) => {
-                text += "[";
-                for i in l {
-                    match i {
-                        Type::Number(i) => text += format!("{}, ", i).as_str(),
-                        Type::String(s) => text += format!("'{}' , ", s).as_str(),
-                        _ => {}
-                    }
-                }
-                text += "]";
-            }
-            Type::Bool(b) => {
-                text += &b.to_string();
-            }
-        }
+        
+        let value = self.compute(arg.trim().to_string());
+        text += &self.type_string(value);
+        text = text.replace("'", "").replace('"', "");
+
         if let ExecutionMode::Script = self.execution_mode {
             println!("{text}");
         } else {

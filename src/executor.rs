@@ -1188,7 +1188,7 @@ impl<'a> Executor<'a> {
     }
 
     /// 型の文字列表記
-    fn type_string(&mut self, data: Type) -> String {
+    pub fn type_string(&mut self, data: Type) -> String {
         match data {
             Type::String(s) => format!("'{s}'"),
             Type::Number(i) => format!("{}", i.to_string()),
@@ -1493,11 +1493,9 @@ impl<'a> Executor<'a> {
             }
         }
         let result = stack.pop().unwrap_or(Type::Number(0.0));
-
-        if let ExecutionMode::Script = self.execution_mode {
-        } else {
-            println!("結果 = {}", self.type_string(result.clone()))
-        }
+        let value = self.type_string(result.clone());
+        self.log_print(format!("結果 = {}", value));
+        
         return result;
     }
 }
