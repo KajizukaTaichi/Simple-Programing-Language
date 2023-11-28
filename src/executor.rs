@@ -640,8 +640,8 @@ impl<'a> Executor<'a> {
             let len = self.memory.len();
             for index in 0..len {
                 let vars = self.memory[index].clone();
-                let value  = self.type_string(vars.value.clone());
-                println!("| [{:>3}] {:<name_max_len$} :{}",index, vars.name, value);
+                let value = self.type_string(vars.value.clone());
+                println!("| [{:>3}] {:<name_max_len$} :{}", index, vars.name, value);
             }
         } else {
             self.log_print(format!("変数がありません"));
@@ -928,7 +928,7 @@ impl<'a> Executor<'a> {
         //　入力
         if name == "input" {
             self.log_print(format!("標準ライブラリのinput関数を呼び出します"));
-            return Some(Type::String(self.input()));
+            return Some(Type::String(self.input(args[0].clone())));
         }
 
         // 参照
@@ -1336,7 +1336,11 @@ impl<'a> Executor<'a> {
                                             } else if item == "false" {
                                                 stack.push(Type::Bool(false));
                                             } else {
-                                                stack.push(Type::String(item.to_string()));
+                                                stack.push(Type::String(
+                                                    item.replace("'", "")
+                                                        .replace('"', "")
+                                                        .to_string(),
+                                                ));
                                             }
                                         }
                                     }
@@ -1360,7 +1364,11 @@ impl<'a> Executor<'a> {
                                             } else if item == "false" {
                                                 stack.push(Type::Bool(false));
                                             } else {
-                                                stack.push(Type::String(item.to_string()));
+                                                stack.push(Type::String(
+                                                    item.replace("'", "")
+                                                        .replace('"', "")
+                                                        .to_string(),
+                                                ));
                                             }
                                         }
                                     }
@@ -1391,7 +1399,11 @@ impl<'a> Executor<'a> {
                                             } else if item == "false" {
                                                 stack.push(Type::Bool(false));
                                             } else {
-                                                stack.push(Type::String(item.to_string()));
+                                                stack.push(Type::String(
+                                                    item.replace("'", "")
+                                                        .replace('"', "")
+                                                        .to_string(),
+                                                ));
                                             }
                                         }
                                     }
@@ -1411,7 +1423,11 @@ impl<'a> Executor<'a> {
                                             } else if item == "false" {
                                                 stack.push(Type::Bool(false));
                                             } else {
-                                                stack.push(Type::String(item.to_string()));
+                                                stack.push(Type::String(
+                                                    item.replace("'", "")
+                                                        .replace('"', "")
+                                                        .to_string(),
+                                                ));
                                             }
                                         }
                                     }
@@ -1474,7 +1490,9 @@ impl<'a> Executor<'a> {
                                     } else if item == "false" {
                                         stack.push(Type::Bool(false));
                                     } else {
-                                        stack.push(Type::String(item.to_string()));
+                                        stack.push(Type::String(
+                                            item.replace("'", "").replace('"', "").to_string(),
+                                        ));
                                     }
                                 }
                             }
@@ -1485,7 +1503,9 @@ impl<'a> Executor<'a> {
                             } else if item == "false" {
                                 stack.push(Type::Bool(false));
                             } else {
-                                stack.push(Type::String(item.to_string()));
+                                stack.push(Type::String(
+                                    item.replace("'", "").replace('"', "").to_string(),
+                                ));
                             }
                         }
                     }
@@ -1495,7 +1515,7 @@ impl<'a> Executor<'a> {
         let result = stack.pop().unwrap_or(Type::Number(0.0));
         let value = self.type_string(result.clone());
         self.log_print(format!("結果 = {}", value));
-        
+
         return result;
     }
 }

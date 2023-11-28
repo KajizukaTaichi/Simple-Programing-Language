@@ -26,7 +26,7 @@ print'Build on Simple programing language'
 
 while true
     #無限に入力を受け付ける
-    var num = number(input())
+    var num = number(input("数値を入力して判定>>> "))
 
     if num 0 =　
         print'終了します'

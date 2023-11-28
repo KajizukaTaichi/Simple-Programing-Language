@@ -4,7 +4,7 @@ impl<'a> Executor<'a> {
     pub fn print(&mut self, arg: String) {
         let mut text = String::new();
         self.log_print(format!("標準出力に表示します"));
-        
+
         let value = self.compute(arg.trim().to_string());
         text += &self.type_string(value);
         text = text.replace("'", "").replace('"', "");
@@ -17,14 +17,21 @@ impl<'a> Executor<'a> {
     }
 
     /// 標準入力
-    pub fn input(&mut self) -> String {
-        let inputed = if let ExecutionMode::Script = self.execution_mode {
-            input("> ")
+    pub fn input(&mut self, prompt: String) -> String {
+        let prompt = match self.compute(prompt) {
+            Type::String(s) => s,
+            _ => {
+                self.log_print("エラー! 入力プロンプトは文字列型です".to_string());
+                "".to_string()
+            }
+        };
+        if let ExecutionMode::Script = self.execution_mode {
+            input(prompt.as_str())
         } else {
             self.log_print("標準入力を受け取ります".to_string());
+            self.log_print(format!("プロンプト:「{prompt}」"));
             input("[入力]> ")
-        };
-        inputed
+        }
     }
 
     pub fn string(&mut self, arg: String) -> String {
