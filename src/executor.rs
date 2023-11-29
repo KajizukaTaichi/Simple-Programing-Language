@@ -611,6 +611,7 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// 実行過程をログ表示
     pub fn log_print(&self, text: String) {
         if let ExecutionMode::Script = self.execution_mode {
         } else {
@@ -618,6 +619,7 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// メモリを表示
     fn show_memory(&mut self) {
         let mut name_max_len = 0;
         for i in self.memory.iter() {
@@ -675,7 +677,7 @@ impl<'a> Executor<'a> {
         self.memory.iter().position(|x| x.name == name)
     }
 
-    /// リストの値を得る
+    /// シーケンス型の値を得る
     fn get_sequence_value(&mut self, item: Type, index: String) -> Type {
         if let Type::List(ref sequence) = item {
             let index = if let Type::Number(i) = self.compute(index.clone()) {
@@ -731,7 +733,7 @@ impl<'a> Executor<'a> {
         }
     }
 
-    /// リストの値をセットする
+    /// シーケンス型の値をセットする
     fn set_sequence_value(&mut self, item: String, value: Type) {
         let new_lines: Vec<String> = item
             .trim()
@@ -800,7 +802,7 @@ impl<'a> Executor<'a> {
         }
     }
 
-    /// リストの値を削除する
+    /// シーケンス型の値を削除する
     fn del_sequence_value(&mut self, item: String) {
         let new_lines: Vec<String> = item
             .trim()
@@ -968,7 +970,7 @@ impl<'a> Executor<'a> {
         return None;
     }
 
-    ///　関数を呼び出す
+    ///　ユーザー定義関数を呼び出す
     fn call_function(&mut self, item: String) -> Type {
         if !item.contains("(") {
             println!("エラー! 関数にはカッコをつけてください");

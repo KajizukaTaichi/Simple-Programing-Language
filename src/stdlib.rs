@@ -1,6 +1,7 @@
 use crate::executor::{input, ExecutionMode, Executor, Type};
 
 impl<'a> Executor<'a> {
+    /// 標準出力
     pub fn print(&mut self, arg: String) {
         let mut text = String::new();
         self.log_print(format!("標準出力に表示します"));
@@ -34,6 +35,7 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// 文字列型に変換
     pub fn string(&mut self, arg: String) -> String {
         self.log_print("文字列型に変換します".to_string());
         return match self.compute(arg) {
@@ -53,6 +55,7 @@ impl<'a> Executor<'a> {
         };
     }
 
+    /// 数値型に変換
     pub fn number(&mut self, arg: String) -> f64 {
         self.log_print("数値型に変換します".to_string());
         return match self.compute(arg) {
@@ -79,6 +82,7 @@ impl<'a> Executor<'a> {
         };
     }
 
+    /// 論理型に変換
     pub fn bool(&mut self, arg: String) -> bool {
         self.log_print("論理型に変換します".to_string());
         match self.compute(
@@ -93,6 +97,7 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// リストを生成
     pub fn list(&mut self, arg: String) -> Vec<Type> {
         let mut list: Vec<Type> = Vec::new();
         for i in self.tokenize_arguments(arg.as_str()) {
@@ -104,6 +109,7 @@ impl<'a> Executor<'a> {
         return list;
     }
 
+    /// 変数を参照
     pub fn refer(&mut self, args: String) -> f64 {
         self.log_print("変数の参照を取得します".to_string());
 
@@ -117,6 +123,7 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// 指定したメモリアドレスにアクセス
     pub fn access(&mut self, args: String) -> Type {
         let address = match self.compute(args.clone()) {
             Type::Number(n) => n,
