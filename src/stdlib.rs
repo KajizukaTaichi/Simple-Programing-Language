@@ -120,10 +120,13 @@ impl<'a> Executor<'a> {
     pub fn access(&mut self, args: String) -> Type {
         let address = match self.compute(args.clone()) {
             Type::Number(n) => n,
-            _ => 0.0,
+            _ => {
+                self.log_print("エラー! メモリアドレスは数値型です".to_string());
+                0.0
+            }
         };
         self.log_print(format!("メモリアドレス{address}の指す値を求めます"));
-        if address.round() as usize > &self.memory.len() - 1 {
+        if address.round() as usize + 1 > self.memory.len() {
             println!("エラー! アドレスが有効範囲外です");
             Type::Number(0.0)
         } else {
