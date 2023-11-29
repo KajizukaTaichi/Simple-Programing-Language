@@ -26,14 +26,15 @@ print'Build on Simple programing language'
 
 while true
     #無限に入力を受け付ける
-    var num = number(input("数値を入力して判定>>> "))
+    var enter = input("数値を入力して判定>>> ")
+    var target = number(enter)
 
-    if num 0 =　
+    if enter exit =　
         print'終了します'
         break
     end if
 
-    var ptr = ref(num) #numの参照
+    var ptr = ref(target) #targetの参照
     
     #prime関数を呼び出す
     if prime(ptr) true =
@@ -42,5 +43,5 @@ while true
         var text = 'は素数ではありません'
     end if
     
-    print string(access(ptr)) text +
+    print string(enter [len]) 桁の + string(access(ptr)) + text +
 end while
