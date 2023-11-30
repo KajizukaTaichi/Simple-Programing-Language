@@ -947,7 +947,7 @@ impl<'a> Executor<'a> {
 
         // データ型を判定
         if name == "type" {
-            self.log_print(format!("標準ライブラリのstring関数を呼び出します"));
+            self.log_print(format!("標準ライブラリのtype関数を呼び出します"));
             return Some(self.types(args[0].clone()));
         }
 
