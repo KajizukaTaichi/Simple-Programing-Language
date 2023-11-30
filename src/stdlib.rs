@@ -123,6 +123,16 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// データ型を返す
+    pub fn types(&mut self, args: String) -> Type {
+        Type::String(match self.compute(args) {
+            Type::Number(_) => "number".to_string(),
+            Type::String(_) => "string".to_string(),
+            Type::Bool(_) => "bool".to_string(),
+            Type::List(_) => "list".to_string(),
+        })
+    }
+
     /// 指定したメモリアドレスにアクセス
     pub fn access(&mut self, args: String) -> Type {
         let address = match self.compute(args.clone()) {
