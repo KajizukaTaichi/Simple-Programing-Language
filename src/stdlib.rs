@@ -125,6 +125,7 @@ impl<'a> Executor<'a> {
 
     /// データ型を返す
     pub fn types(&mut self, args: String) -> Type {
+        self.log_print(format!("データ型を判定します"));
         Type::String(match self.compute(args) {
             Type::Number(_) => "number".to_string(),
             Type::String(_) => "string".to_string(),
