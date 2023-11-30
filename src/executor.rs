@@ -939,9 +939,16 @@ impl<'a> Executor<'a> {
             return Some(Type::Number(self.refer(args[0].clone())));
         }
 
+        //　指定したメモリアドレスにアクセス
         if name == "access" {
             self.log_print(format!("標準ライブラリのaccess関数を呼び出します"));
             return Some(self.access(args[0].clone()));
+        }
+
+        // データ型を判定
+        if name == "type" {
+            self.log_print(format!("標準ライブラリのstring関数を呼び出します"));
+            return Some(self.types(args[0].clone()));
         }
 
         // 文字列に変換
