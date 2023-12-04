@@ -1290,10 +1290,10 @@ impl<'a> Executor<'a> {
 
             // 関数を呼び出す
             if item.contains("(") && item.contains(")") {
-                match self.call_stdlib(item.to_string()) {
-                    Some(i) => stack.push(i),
-                    None => stack.push(self.call_function(item.to_string())),
-                }
+                stack.push(match self.call_stdlib(item.to_string()) {
+                    Some(i) => i,
+                    None =>self.call_function(item.to_string()),
+                });
                 continue;
             }
 
