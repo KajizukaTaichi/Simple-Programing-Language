@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::process::exit;
+use crate::get_file_contents;
 
 /// 標準入力を取得する
 pub fn input(prompt: &str) -> String {
@@ -366,6 +367,16 @@ impl<'a> Executor<'a> {
                 } else if code.contains("while") {
                     self.expr = code.replacen("while", "", 1);
                     self.control_mode = ControlMode::While;
+
+                } else if code.contains("import") {
+                    let code = code.replacen("import", "", 1);
+                    self.log_print(format!("モジュール{code}を読み込みます"));
+                    let module = match get_file_contents(code) {
+                        Ok(code) => code,
+                        Err(e) => {self.log_print(format!("エラー! {e}"));"".to_string()}
+                    };
+
+                    self.script(&module);
                 } else if code.contains("print") {
                     //　標準出力
                     let text = self
