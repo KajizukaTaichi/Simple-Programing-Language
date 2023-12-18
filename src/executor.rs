@@ -101,6 +101,7 @@ impl<'a> Executor<'a> {
                         self.nest_for -= 1;
                         self.stmt.push(code.to_string());
                     } else {
+                        self.log_print(format!("ループ回数を求めます"));
                         let count = if let Type::Number(i) = self.compute(self.expr.clone()) {
                             i.round() as usize
                         } else {
@@ -356,7 +357,6 @@ impl<'a> Executor<'a> {
                     // 関数呼び出し
                     self.call_function(code.to_string());
                 } else if code.contains("for") {
-                    self.log_print(format!("ループ回数を求めます"));
                     let new_code = code.replacen("for", "", 1);
                     self.expr = new_code;
                     self.control_mode = ControlMode::For;
