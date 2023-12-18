@@ -1,31 +1,15 @@
 use crate::executor::{input, ExecutionMode, Executor, Type};
 
 impl<'a> Executor<'a> {
+    /// 標準出力
     pub fn print(&mut self, arg: String) {
         let mut text = String::new();
         self.log_print(format!("標準出力に表示します"));
-        match self.compute(arg.trim().to_string()) {
-            Type::Number(i) => {
-                text += i.to_string().as_str();
-            }
-            Type::String(s) => {
-                text += s.replace("'", "").replace('"', "").as_str();
-            }
-            Type::List(l) => {
-                text += "[";
-                for i in l {
-                    match i {
-                        Type::Number(i) => text += format!("{}, ", i).as_str(),
-                        Type::String(s) => text += format!("'{}' , ", s).as_str(),
-                        _ => {}
-                    }
-                }
-                text += "]";
-            }
-            Type::Bool(b) => {
-                text += &b.to_string();
-            }
-        }
+
+        let value = self.compute(arg.trim().to_string());
+        text += &self.type_string(value);
+        text = text.replace("'", "").replace('"', "");
+
         if let ExecutionMode::Script = self.execution_mode {
             println!("{text}");
         } else {
@@ -34,16 +18,24 @@ impl<'a> Executor<'a> {
     }
 
     /// 標準入力
-    pub fn input(&mut self) -> String {
-        let inputed = if let ExecutionMode::Script = self.execution_mode {
-            input("> ")
+    pub fn input(&mut self, prompt: String) -> String {
+        let prompt = match self.compute(prompt) {
+            Type::String(s) => s,
+            _ => {
+                self.log_print("エラー! 入力プロンプトは文字列型です".to_string());
+                "".to_string()
+            }
+        };
+        if let ExecutionMode::Script = self.execution_mode {
+            input(prompt.as_str())
         } else {
             self.log_print("標準入力を受け取ります".to_string());
+            self.log_print(format!("プロンプト:「{prompt}」"));
             input("[入力]> ")
-        };
-        inputed
+        }
     }
 
+    /// 文字列型に変換
     pub fn string(&mut self, arg: String) -> String {
         self.log_print("文字列型に変換します".to_string());
         return match self.compute(arg) {
@@ -63,6 +55,7 @@ impl<'a> Executor<'a> {
         };
     }
 
+    /// 数値型に変換
     pub fn number(&mut self, arg: String) -> f64 {
         self.log_print("数値型に変換します".to_string());
         return match self.compute(arg) {
@@ -89,6 +82,7 @@ impl<'a> Executor<'a> {
         };
     }
 
+    /// 論理型に変換
     pub fn bool(&mut self, arg: String) -> bool {
         self.log_print("論理型に変換します".to_string());
         match self.compute(
@@ -103,13 +97,10 @@ impl<'a> Executor<'a> {
         }
     }
 
+    /// リストを生成
     pub fn list(&mut self, arg: String) -> Vec<Type> {
-        let expr = arg
-            .replacen("list", "", 1)
-            .replace("[", "")
-            .replace("]", "");
         let mut list: Vec<Type> = Vec::new();
-        for i in expr.split(",") {
+        for i in self.tokenize_arguments(arg.as_str()) {
             if i.trim().is_empty() {
                 continue;
             }
@@ -117,6 +108,8 @@ impl<'a> Executor<'a> {
         }
         return list;
     }
+
+    /// 変数を参照
     pub fn refer(&mut self, args: String) -> f64 {
         self.log_print("変数の参照を取得します".to_string());
 
@@ -127,6 +120,35 @@ impl<'a> Executor<'a> {
         } else {
             self.log_print(format!("エラー! 変数が見つかりませんでした"));
             0.0
+        }
+    }
+
+    /// データ型を返す
+    pub fn types(&mut self, args: String) -> Type {
+        self.log_print(format!("データ型を判定します"));
+        Type::String(match self.compute(args) {
+            Type::Number(_) => "number".to_string(),
+            Type::String(_) => "string".to_string(),
+            Type::Bool(_) => "bool".to_string(),
+            Type::List(_) => "list".to_string(),
+        })
+    }
+
+    /// 指定したメモリアドレスにアクセス
+    pub fn access(&mut self, args: String) -> Type {
+        let address = match self.compute(args.clone()) {
+            Type::Number(n) => n,
+            _ => {
+                self.log_print("エラー! メモリアドレスは数値型です".to_string());
+                0.0
+            }
+        };
+        self.log_print(format!("メモリアドレス{address}の指す値を求めます"));
+        if address.round() as usize + 1 > self.memory.len() {
+            println!("エラー! アドレスが有効範囲外です");
+            Type::Number(0.0)
+        } else {
+            self.memory[address.round() as usize].value.clone()
         }
     }
 }

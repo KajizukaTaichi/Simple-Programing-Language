@@ -15,7 +15,7 @@ impl<'a> Executor<'a> {
 
             match self.control_mode {
                 ControlMode::For => {
-                    if code.contains("end for") {
+                    if code.contains("end for") || code.contains("endfor") {
                         // ネストの階層を判別する
                         if self.nest_for > 0 {
                             self.nest_for -= 1;
@@ -44,7 +44,7 @@ impl<'a> Executor<'a> {
                     if code.contains("else") {
                         // モードをelseに変える
                         self.control_mode = ControlMode::Else
-                    } else if code.contains("end if") {
+                    } else if code.contains("end if") || code.contains("endif") {
                         if self.nest_if > 0 {
                             self.nest_if -= 1;
                             self.stmt.push(code.to_string());
@@ -67,7 +67,7 @@ impl<'a> Executor<'a> {
                 }
 
                 ControlMode::Else => {
-                    if code.contains("end if") {
+                    if code.contains("end if") || code.contains("endif") {
                         if self.nest_if > 0 {
                             self.nest_if -= 1;
                             self.else_stmt.push(code.to_string());
@@ -99,7 +99,7 @@ impl<'a> Executor<'a> {
                     }
                 }
                 ControlMode::While => {
-                    if code.contains("end while") {
+                    if code.contains("end while") || code.contains("endwhile") {
                         if self.nest_while > 0 {
                             self.nest_while -= 1;
                             self.stmt.push(code.to_string());
@@ -121,7 +121,7 @@ impl<'a> Executor<'a> {
                 }
 
                 ControlMode::Function => {
-                    if code.contains("end func") {
+                    if code.contains("end func") || code.contains("endfunc") {
                         if self.nest_func > 0 {
                             self.nest_func -= 1;
                             self.stmt.push(code.to_string());
@@ -153,13 +153,13 @@ impl<'a> Executor<'a> {
                         }
                     } else if code.contains("func") {
                         //　関数の定義
-                        if !code.contains("(") {
+                        if !code.contains("(") || !code.contains(")") {
                             println!("エラー! 関数にはカッコをつけてください");
                         }
                         self.control_mode = ControlMode::Function;
                     } else if code.contains("call") {
                         // 関数呼び出し
-                        if !code.contains("(") {
+                        if !code.contains("(") || !code.contains(")") {
                             println!("エラー! 関数にはカッコをつけてください");
                         }
                     } else if code.contains("for") {
@@ -168,13 +168,6 @@ impl<'a> Executor<'a> {
                         self.control_mode = ControlMode::If
                     } else if code.contains("while") {
                         self.control_mode = ControlMode::While;
-                    } else if code.contains("rand") {
-                        // 乱数
-                        let new_code = code.replacen("rand", "", 1);
-                        let params = new_code.split(",").collect::<Vec<&str>>();
-                        if params.len() < 3 {
-                            println!("エラー! rand分には3つに引数が必要です");
-                        }
                     } else {
                         if let ExecutionMode::Script = self.execution_mode {
                         } else {
