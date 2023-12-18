@@ -414,10 +414,7 @@ impl<'a> Executor<'a> {
                     self.log_print(format!("プロセスを終了します"));
                     exit(0)
                 } else {
-                    if let ExecutionMode::Script = self.execution_mode {
-                    } else {
-                        println!("コマンドが不正です: {}", code)
-                    }
+                    self.compute(code);
                 }
             }
         }
