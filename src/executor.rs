@@ -1473,13 +1473,13 @@ impl<'a> Executor<'a> {
                             match item {
                                 "!" => {
                                     let y = match y {
-                                        Type::Number(i) => i,
+                                        Type::Bool(b) => b,
                                         _ => {
                                             println!("型が一致しません");
-                                            0.0
+                                            false
                                         }
                                     };
-                                    stack.push(Type::Bool(y == 0.0));
+                                    stack.push(Type::Bool(!y));
                                     continue;
                                 }
                                 "~" => {
