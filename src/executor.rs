@@ -930,6 +930,12 @@ impl<'a> Executor<'a> {
             return Some(Type::String(self.input(args[0].clone())));
         }
 
+        //　出力
+        if name == "print" {
+            self.log_print(format!("標準ライブラリのprint関数を呼び出します"));
+            self.print(args[0].clone());
+        }
+
         // 参照
         if name == "ref" {
             self.log_print(format!("標準ライブラリのref関数を呼び出します"));
@@ -966,6 +972,7 @@ impl<'a> Executor<'a> {
             return Some(Type::Bool(self.bool(args[0].clone())));
         }
 
+        // リストを作成
         if name == "list" {
             self.log_print(format!("標準ライブラリのlist関数を呼び出します"));
             return Some(Type::List(self.list(args.join(",").clone())));
