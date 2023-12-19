@@ -376,7 +376,9 @@ impl<'a> Executor<'a> {
                         Err(e) => {self.log_print(format!("エラー! {e}"));"".to_string()}
                     };
 
+                    let mode = self.execution_mode.clone();
                     self.script(&module);
+                    self.execution_mode = mode;
                 } else if code.contains("print") {
                     //　標準出力
                     let text = self
