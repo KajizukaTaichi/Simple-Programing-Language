@@ -37,7 +37,7 @@ impl<'a> Executor<'a> {
     }
 
     pub fn now(&mut self) -> f64 {
-        self.log_print("今の時刻を取得します".to_string());
+        self.log_print("今の時刻をUNIXエポックで取得します".to_string());
         let current_time = SystemTime::now();
         match current_time.duration_since(UNIX_EPOCH) {
             Ok(duration) => {
