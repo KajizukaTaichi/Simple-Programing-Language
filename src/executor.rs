@@ -950,12 +950,20 @@ impl<'a> Executor<'a> {
         if name == "print" {
             self.log_print(format!("標準ライブラリのprint関数を呼び出します"));
             self.print(args[0].clone());
+            return Some(Type::Bool(true));
         }
 
-        //　出力
-        if name == "now" {
-            self.log_print(format!("標準ライブラリのnow関数を呼び出します"));
-            return Some(Type::Number(self.now()));
+        //　現在時刻
+        if name == "time.now" {
+            self.log_print(format!("標準ライブラリのtime.now関数を呼び出します"));
+            return Some(Type::Number(self.time_now()));
+        }
+
+        //　スリープ
+        if name == "time.sleep" {
+            self.log_print(format!("標準ライブラリのtime.sleep関数を呼び出します"));
+            self.time_sleep(args[0].clone());
+            return Some(Type::Bool(true));
         }
 
         // 参照

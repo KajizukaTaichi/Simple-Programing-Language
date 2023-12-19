@@ -1,5 +1,7 @@
 use crate::executor::{input, ExecutionMode, Executor, Type};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::thread;
+use std::time::Duration;
 
 impl<'a> Executor<'a> {
     /// 標準出力
@@ -36,7 +38,7 @@ impl<'a> Executor<'a> {
         }
     }
 
-    pub fn now(&mut self) -> f64 {
+    pub fn time_now(&mut self) -> f64 {
         self.log_print("今の時刻をUNIXエポックで取得します".to_string());
         let current_time = SystemTime::now();
         match current_time.duration_since(UNIX_EPOCH) {
@@ -51,6 +53,15 @@ impl<'a> Executor<'a> {
                 self.log_print(format!("エラー: {:?}", err));0.0
             }
         }
+    }
+
+    pub fn time_sleep(&mut self, arg: String) {
+        let sep = match self.compute(arg) {
+            Type::Number(i) => i,
+            _ => {self.log_print("エラー! 秒数は数値型です".to_string()); return}   
+        };
+        self.log_print(format!("{sep}秒間スリープします"));
+        thread::sleep(Duration::from_secs(sep as u64)); // 3秒間スリープ
     }
 
     /// 文字列型に変換
