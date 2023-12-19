@@ -377,7 +377,10 @@ impl<'a> Executor<'a> {
                     };
 
                     let mode = self.execution_mode.clone();
-                    self.script(&module);
+                    match self.execution_mode {
+                        ExecutionMode::Script => {self.script(&module);},
+                        ExecutionMode::Debug | ExecutionMode::Interactive => {self.debugger(&module);}
+                    }
                     self.execution_mode = mode;
                 } else if code.contains("print") {
                     //　標準出力
