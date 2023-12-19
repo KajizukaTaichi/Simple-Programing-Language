@@ -952,6 +952,12 @@ impl<'a> Executor<'a> {
             self.print(args[0].clone());
         }
 
+        //　出力
+        if name == "now" {
+            self.log_print(format!("標準ライブラリのnow関数を呼び出します"));
+            return Some(Type::Number(self.now()));
+        }
+
         // 参照
         if name == "ref" {
             self.log_print(format!("標準ライブラリのref関数を呼び出します"));

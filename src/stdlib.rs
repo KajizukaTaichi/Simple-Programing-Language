@@ -1,4 +1,5 @@
 use crate::executor::{input, ExecutionMode, Executor, Type};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 impl<'a> Executor<'a> {
     /// 標準出力
@@ -32,6 +33,23 @@ impl<'a> Executor<'a> {
             self.log_print("標準入力を受け取ります".to_string());
             self.log_print(format!("プロンプト:「{prompt}」"));
             input("[入力]> ")
+        }
+    }
+
+    pub fn now(&mut self) -> f64 {
+        self.log_print("今の時刻を取得します".to_string());
+        let current_time = SystemTime::now();
+        match current_time.duration_since(UNIX_EPOCH) {
+            Ok(duration) => {
+                let secs = duration.as_secs() as f64; // 秒数をf64に変換
+                let nanos = duration.subsec_nanos() as f64; // ナノ秒をf64に変換
+                let total_seconds = secs + nanos / 1_000_000_000.0; // 秒数とナノ秒の合計を計算
+
+                total_seconds
+            }
+            Err(err) => {
+                self.log_print(format!("エラー: {:?}", err));0.0
+            }
         }
     }
 
