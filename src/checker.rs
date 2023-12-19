@@ -1,4 +1,5 @@
 use crate::executor::{ControlMode, ExecutionMode, Executor};
+use crate::get_file_contents;
 
 impl<'a> Executor<'a> {
     /// 構文チェック
@@ -164,6 +165,15 @@ impl<'a> Executor<'a> {
                         }
                     } else if code.contains("for") {
                         self.control_mode = ControlMode::For;
+                    } else if code.contains("import") {
+                    let code = code.replacen("import", "", 1);
+                    self.log_print(format!("モジュール{code}を読み込みます"));
+                    let module = match get_file_contents(code) {
+                        Ok(code) => code,
+                        Err(e) => {println!("エラー! {e}");"".to_string()}
+                    };
+
+                    self.check(module.split("\n").map(|x|x.to_string()).collect());
                     } else if code.contains("if") {
                         self.control_mode = ControlMode::If
                     } else if code.contains("while") {
