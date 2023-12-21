@@ -1,0 +1,31 @@
+import library.smp
+
+print "数あてゲーム"
+var answer = number(string(rand()) string(rand()) +)
+var count = 1
+
+while true
+    print string(count) 回目の挑戦 +
+
+    try
+        var guess = number(input("> "))
+    catch
+        print 数値を入力してね
+        next
+    end try
+
+    if guess answer >
+        print 大きすぎるよ
+    end if
+
+    if guess answer <
+        print 小さすぎるよ
+    end if
+
+    if guess answer =
+        print string(count) 回目で正解！おめでとうございます +
+        break
+    end if
+
+    var count = count 1 +
+end while

@@ -1,0 +1,6 @@
+var now = 0
+while true
+    print now
+    var now = now 1 +
+    time.sleep(1)
+end while

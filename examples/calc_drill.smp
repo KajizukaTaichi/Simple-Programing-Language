@@ -1,0 +1,32 @@
+import library.smp
+
+print "計算ドリル"
+var count = 0
+var start = time.now()
+
+while true    
+    var num1 = rand()
+    var num2 = rand()
+    var sum = num1 num2 +
+
+    print string(num1) " + " + string(num2) + " = ?" +
+
+    try
+        var answer = number(input("> "))
+    catch
+        break
+    end try
+
+    if answer sum =
+        print "正解!おめでとうございます
+        var count = count 1 +
+    else
+        break
+    end if
+end while
+
+print "終了!!!"
+print "解いた回数: " string(count) + "問"　+
+var time = time.now() start - 
+print "スピード: " string(round(count time / 70 *)) +  "km/h" +
+print "点数: " string(round(count time / 70 * count *)) + ".pts" +

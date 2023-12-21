@@ -1,3 +1,22 @@
+func rand()
+    var now = string(time.now())
+    return round(number(now [now [len] 1 -]))
+end func
+
+func round(number)
+    var number = string(number)
+    var index = 0
+    var result = ""
+    while index number [len] <
+        if number [index] "." =
+            return number(result)
+        end if
+        var result = result number [index] +
+        var index = index 1 +
+    end while
+    return number(result)
+end func
+
 func prime(ptr)
     #素数かどうか判定する関数
     #引数はポインタ

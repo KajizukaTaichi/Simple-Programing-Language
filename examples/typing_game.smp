@@ -1,0 +1,46 @@
+import library.smp
+
+print "ビジネス用語タイピングゲーム"
+
+var words = list(収益最大化が企業の最終目標です,顧客ロイヤルティを高める戦略を構築する,マーケティング戦略をブランドイメージに合わせる,ターゲット市場を正確に特定する必要がある,コアコンピタンスを活かした競争戦略を展開する,リスク管理は事業成功の鍵です,効率的な生産プロセスを確立することが重要です,持続可能なビジネスモデルを追求する,企業価値を最大化するための戦略を練る,顧客ニーズに応じた製品を開発する,新規市場参入のための計画を練る,チームのシナジーを最大限に活用する,組織文化を構築し、社員のモチベーションを高める,ビジネスプロセスの改善を定期的に行う,競争環境の分析を行うことが重要です,ユーザーエクスペリエンスを向上させる施策を講じる,コスト削減策を実行に移す,プロジェクトのマイルストーンを達成する,長期的な成長戦略を策定する,データ駆動の意思決定を実践する,リーダーシップスキルを強化するトレーニングを実施する,技術革新を積極的に取り入れる,顧客満足度を向上させる施策を展開する,グローバル展開のための戦略を練る,マーケットシェアを拡大するための施策を講じる,持続可能な開発目標を設定する,リスクとリターンのバランスを考慮する,イノベーションを促進する環境を整える,資産ポートフォリオを最適化する戦略を実行する,グローバル競争力を強化する戦略を採用する)
+
+var index = 0
+var miss = 0
+var ok = 0
+
+try
+    var limit = number(input("何秒チャレンジする？"))
+catch:
+    var limit = 30
+end try
+
+input("スタート!")
+var start = time.now()
+while index words [len] <
+    if time.now() start - limit >
+        break
+    end if
+
+    print 「　words [index] + 」 +
+
+    var answer = input("> ")
+
+    if answer words [index] =
+        print "OK, very good!"
+        var ok = ok 1 +
+    else
+        print "Try again"
+        var miss = miss 1 +
+        next
+    end if
+
+    var index = index 1 +
+end while
+
+print "-- Finish --"
+print "OK回数: " string(ok) + "問"　+
+print "ミス回数: " string(miss) + "問"　+
+var time = time.now() start - 
+var speed = round(ok time / 300　*)
+print "スピード: " string(speed) +  "km/h" +
+print "点数: " string(round(ok speed + 57 * miss 7 * -)) + ".pts" +

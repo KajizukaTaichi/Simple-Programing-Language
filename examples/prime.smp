@@ -5,7 +5,7 @@ print'Build on Simple programing language'
 
 while true
     #無限に入力を受け付ける
-    var enter = input("数値を入力して判定>>> ")
+    var enter = input("> ")
     
     try
         var target = number(enter)
@@ -14,10 +14,10 @@ while true
             print'終了します'
             break
         end if
-        print "文字列は判定できません
         next
     end try
     
+    var target = round(target)
     var ptr = ref(target) #targetの参照
     
     #prime関数を呼び出す
