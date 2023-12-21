@@ -1,15 +1,19 @@
-use crate::executor::{input, ExecutionMode, Executor, Type};
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::executor::{input, ExecutionMode, Executor, ReturnValue, Type};
 use std::thread;
 use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 impl<'a> Executor<'a> {
     /// 標準出力
-    pub fn print(&mut self, arg: String) {
+    pub fn print(&mut self, arg: String) -> ReturnValue {
         let mut text = String::new();
         self.log_print(format!("標準出力に表示します"));
 
-        let value = self.compute(arg.trim().to_string());
+        let value = match self.compute(arg.trim().to_string()) {
+            ReturnValue::Some(i) => i,
+            ReturnValue::Error(e) => return ReturnValue::Error(e),
+            _ => Type::Number(0.0),
+        };
         text += &self.type_string(value);
         text = text.replace("'", "").replace('"', "");
 
@@ -18,27 +22,32 @@ impl<'a> Executor<'a> {
         } else {
             println!("[出力]: {text}");
         }
+        ReturnValue::None
     }
 
     /// 標準入力
-    pub fn input(&mut self, prompt: String) -> String {
-        let prompt = match self.compute(prompt) {
+    pub fn input(&mut self, prompt: String) -> ReturnValue {
+        let prompt = match match self.compute(prompt) {
+            ReturnValue::Some(i) => i,
+            ReturnValue::Error(e) => return ReturnValue::Error(e),
+            _ => Type::Number(0.0),
+        } {
             Type::String(s) => s,
             _ => {
                 self.log_print("エラー! 入力プロンプトは文字列型です".to_string());
-                "".to_string()
+                return ReturnValue::Error("エラー! 入力プロンプトは文字列型です".to_string());
             }
         };
-        if let ExecutionMode::Script = self.execution_mode {
-            input(prompt.as_str())
+        ReturnValue::Some(if let ExecutionMode::Script = self.execution_mode {
+            Type::String(input(prompt.as_str()))
         } else {
             self.log_print("標準入力を受け取ります".to_string());
             self.log_print(format!("プロンプト:「{prompt}」"));
-            input("[入力]> ")
-        }
+            Type::String(input("[入力]> "))
+        })
     }
 
-    pub fn time_now(&mut self) -> f64 {
+    pub fn time_now(&mut self) -> ReturnValue {
         self.log_print("今の時刻をUNIXエポックで取得します".to_string());
         let current_time = SystemTime::now();
         match current_time.duration_since(UNIX_EPOCH) {
@@ -47,137 +56,177 @@ impl<'a> Executor<'a> {
                 let nanos = duration.subsec_nanos() as f64; // ナノ秒をf64に変換
                 let total_seconds = secs + nanos / 1_000_000_000.0; // 秒数とナノ秒の合計を計算
 
-                total_seconds
+                ReturnValue::Some(Type::Number(total_seconds))
             }
             Err(err) => {
-                self.log_print(format!("エラー: {:?}", err));0.0
+                self.log_print(format!("エラー: {:?}", err));
+                return ReturnValue::Error(format!("エラー: {:?}", err));
             }
         }
     }
 
-    pub fn time_sleep(&mut self, arg: String) {
-        let sep = match self.compute(arg) {
+    pub fn time_sleep(&mut self, arg: String) -> ReturnValue {
+        let sep = match match self.compute(arg) {
+            ReturnValue::Some(i) => i,
+            ReturnValue::Error(e) => return ReturnValue::Error(e),
+            _ => Type::Number(0.0),
+        } {
             Type::Number(i) => i,
-            _ => {self.log_print("エラー! 秒数は数値型です".to_string()); return}   
+            _ => {
+                self.log_print("エラー! 秒数は数値型です".to_string());
+                return ReturnValue::Error("エラー! 秒数は数値型です".to_string());
+            }
         };
         self.log_print(format!("{sep}秒間スリープします"));
         thread::sleep(Duration::from_secs(sep as u64)); // 3秒間スリープ
+        ReturnValue::None
     }
 
     /// 文字列型に変換
-    pub fn string(&mut self, arg: String) -> String {
+    pub fn string(&mut self, arg: String) -> ReturnValue {
         self.log_print("文字列型に変換します".to_string());
-        return match self.compute(arg) {
-            Type::Number(i) => i.to_string(),
-            Type::List(l) => l
-                .iter()
-                .map(|x| match x {
-                    Type::Number(i) => i.to_string(),
-                    Type::String(s) => format!("'{s}'"),
-                    Type::List(_) => "".to_string(),
-                    Type::Bool(b) => b.to_string(),
-                })
-                .collect::<Vec<String>>()
-                .join(", "),
-            Type::String(s) => s,
-            Type::Bool(b) => b.to_string(),
-        };
+        return ReturnValue::Some(Type::String(
+            match match self.compute(arg) {
+                ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => Type::Number(0.0),
+            } {
+                Type::Number(i) => i.to_string(),
+                Type::List(l) => l
+                    .iter()
+                    .map(|x| match x {
+                        Type::Number(i) => i.to_string(),
+                        Type::String(s) => format!("'{s}'"),
+                        Type::List(_) => "".to_string(),
+                        Type::Bool(b) => b.to_string(),
+                    })
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                Type::String(s) => s,
+                Type::Bool(b) => b.to_string(),
+            },
+        ));
     }
 
     /// 数値型に変換
-    pub fn number(&mut self, arg: String) -> f64 {
+    pub fn number(&mut self, arg: String) -> ReturnValue {
         self.log_print("数値型に変換します".to_string());
-        return match self.compute(arg) {
-            Type::Number(i) => i,
-            Type::List(l) => match &l[0] {
-                Type::Number(i) => *i,
-                Type::String(ls) => ls.parse().unwrap_or(0.0),
-                _ => 0.0,
-            },
-            Type::String(s) => match s.parse() {
-                Ok(i) => i,
-                Err(_) => {
-                    self.log_print("エラー! 変換できませんでした".to_string());
-                    0.0
+        return ReturnValue::Some(Type::Number(
+            match match self.compute(arg) {
+                ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => Type::Number(0.0),
+            } {
+                Type::Number(i) => i,
+                Type::List(l) => match &l[0] {
+                    Type::Number(i) => *i,
+                    Type::String(ls) => ls.parse().unwrap_or(0.0),
+                    _ => 0.0,
+                },
+                Type::String(s) => match s.parse() {
+                    Ok(i) => i,
+                    Err(_) => {
+                        self.log_print("エラー! 変換できませんでした".to_string());
+                        return ReturnValue::Error("エラー! 変換できませんでした".to_string());
+                    }
+                },
+                Type::Bool(b) => {
+                    if b {
+                        1.0
+                    } else {
+                        0.0
+                    }
                 }
             },
-            Type::Bool(b) => {
-                if b {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
-        };
+        ));
     }
 
     /// 論理型に変換
-    pub fn bool(&mut self, arg: String) -> bool {
+    pub fn bool(&mut self, arg: String) -> ReturnValue {
         self.log_print("論理型に変換します".to_string());
-        match self.compute(
-            arg[..arg.len() - 1].split("(").collect::<Vec<&str>>()[1..]
-                .join("(")
-                .to_string(),
-        ) {
-            Type::Number(i) => i != 0.0,
-            Type::List(l) => l.len() != 0,
-            Type::String(s) => !s.is_empty(),
-            Type::Bool(b) => b,
-        }
+        ReturnValue::Some(Type::Bool(
+            match match self.compute(
+                arg[..arg.len() - 1].split("(").collect::<Vec<&str>>()[1..]
+                    .join("(")
+                    .to_string(),
+            ) {
+                ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => Type::Number(0.0),
+            } {
+                Type::Number(i) => i != 0.0,
+                Type::List(l) => l.len() != 0,
+                Type::String(s) => !s.is_empty(),
+                Type::Bool(b) => b,
+            },
+        ))
     }
 
     /// リストを生成
-    pub fn list(&mut self, arg: String) -> Vec<Type> {
+    pub fn list(&mut self, arg: String) -> ReturnValue {
         let mut list: Vec<Type> = Vec::new();
         for i in self.tokenize_arguments(arg.as_str()) {
             if i.trim().is_empty() {
                 continue;
             }
-            list.push(self.compute(i.to_string()))
+            list.push(match self.compute(i.to_string()) {
+                ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => Type::Number(0.0),
+            })
         }
-        return list;
+        return ReturnValue::Some(Type::List(list));
     }
 
     /// 変数を参照
-    pub fn refer(&mut self, args: String) -> f64 {
+    pub fn refer(&mut self, args: String) -> ReturnValue {
         self.log_print("変数の参照を取得します".to_string());
 
         let address = self.reference_variable(args.clone());
         if let Some(i) = address {
             self.log_print(format!("変数{}のアドレスは{}です", args, i));
-            i as f64
+            return ReturnValue::Some(Type::Number(i as f64));
         } else {
-            self.log_print(format!("エラー! 変数が見つかりませんでした"));
-            0.0
+            return ReturnValue::Error("エラー! 変数が見つかりませんでした".to_string());
         }
     }
 
     /// データ型を返す
-    pub fn types(&mut self, args: String) -> Type {
+    pub fn types(&mut self, args: String) -> ReturnValue {
         self.log_print(format!("データ型を判定します"));
-        Type::String(match self.compute(args) {
-            Type::Number(_) => "number".to_string(),
-            Type::String(_) => "string".to_string(),
-            Type::Bool(_) => "bool".to_string(),
-            Type::List(_) => "list".to_string(),
-        })
+        ReturnValue::Some(Type::String(
+            match match self.compute(args) {
+                ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => Type::Number(0.0),
+            } {
+                Type::Number(_) => "number".to_string(),
+                Type::String(_) => "string".to_string(),
+                Type::Bool(_) => "bool".to_string(),
+                Type::List(_) => "list".to_string(),
+            },
+        ))
     }
 
     /// 指定したメモリアドレスにアクセス
-    pub fn access(&mut self, args: String) -> Type {
-        let address = match self.compute(args.clone()) {
+    pub fn access(&mut self, args: String) -> ReturnValue {
+        let address = match match self.compute(args.clone()) {
+            ReturnValue::Some(i) => i,
+            ReturnValue::Error(e) => return ReturnValue::Error(e),
+            _ => Type::Number(0.0),
+        } {
             Type::Number(n) => n,
             _ => {
                 self.log_print("エラー! メモリアドレスは数値型です".to_string());
-                0.0
+                return ReturnValue::Error("エラー! メモリアドレスは数値型です".to_string());
             }
         };
         self.log_print(format!("メモリアドレス{address}の指す値を求めます"));
         if address.round() as usize + 1 > self.memory.len() {
-            println!("エラー! アドレスが有効範囲外です");
-            Type::Number(0.0)
+            self.log_print("エラー! アドレスが有効範囲外です".to_string());
+            return ReturnValue::Error("エラー! アドレスが有効範囲外です".to_string());
         } else {
-            self.memory[address.round() as usize].value.clone()
+            ReturnValue::Some(self.memory[address.round() as usize].value.clone())
         }
     }
 }

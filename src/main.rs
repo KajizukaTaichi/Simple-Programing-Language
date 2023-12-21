@@ -60,7 +60,7 @@ fn main() {
                 }
             }
             Err(e) => {
-                eprintln!("エラー! {}", e);
+                println!("エラー! {}", e);
             }
         }
     } else if args.len() == 2 {
@@ -73,7 +73,7 @@ fn main() {
                 executor.script(&code);
             }
             Err(e) => {
-                eprintln!("エラー! {}", e);
+                println!("エラー! {}", e);
             }
         }
     } else {

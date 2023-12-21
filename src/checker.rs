@@ -145,6 +145,51 @@ impl<'a> Executor<'a> {
                     }
                 }
 
+                ControlMode::Try => {
+                    if code.contains("catch") {
+                        if self.nest_try > 0 {
+                            self.nest_try -= 1;
+                            self.stmt.push(code.to_string());
+                        } else {
+                            self.control_mode = ControlMode::Catch;
+                        }
+                    } else if code.contains("try") {
+                        self.nest_try += 1;
+                        self.stmt.push(code.to_string());
+                    } else {
+                        self.stmt.push(code.to_string());
+                    }
+                }
+
+                ControlMode::Catch => {
+                    if code.contains("end try") || code.contains("endtry") {
+                        if self.nest_try > 0 {
+                            self.nest_try -= 1;
+                            self.stmt.push(code.to_string());
+                        } else {
+                            Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .check(self.stmt.clone());
+                            Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .check(self.else_stmt.clone());
+                            self.stmt = Vec::new();
+                            self.control_mode = ControlMode::Normal;
+                        }
+                    } else if code.contains("try") {
+                        self.nest_try += 1;
+                        self.else_stmt.push(code.to_string());
+                    } else {
+                        self.else_stmt.push(code.to_string());
+                    }
+                }
+
                 ControlMode::Normal => {
                     if code.contains("var") {
                         // 変数の定義
@@ -166,14 +211,17 @@ impl<'a> Executor<'a> {
                     } else if code.contains("for") {
                         self.control_mode = ControlMode::For;
                     } else if code.contains("import") {
-                    let code = code.replacen("import", "", 1);
-                    self.log_print(format!("モジュール{code}を読み込みます"));
-                    let module = match get_file_contents(code) {
-                        Ok(code) => code,
-                        Err(e) => {println!("エラー! {e}");"".to_string()}
-                    };
+                        let code = code.replacen("import", "", 1);
+                        self.log_print(format!("モジュール{code}を読み込みます"));
+                        let module = match get_file_contents(code) {
+                            Ok(code) => code,
+                            Err(e) => {
+                                println!("エラー! {e}");
+                                "".to_string()
+                            }
+                        };
 
-                    self.check(module.split("\n").map(|x|x.to_string()).collect());
+                        self.check(module.split("\n").map(|x| x.to_string()).collect());
                     } else if code.contains("if") {
                         self.control_mode = ControlMode::If
                     } else if code.contains("while") {
@@ -193,6 +241,9 @@ impl<'a> Executor<'a> {
             }
             ControlMode::If | ControlMode::Else => {
                 println!("エラー! if文の終わりが見つかりません");
+            }
+            ControlMode::Try | ControlMode::Catch => {
+                println!("エラー! try文の終わりが見つかりません");
             }
             ControlMode::For => {
                 println!("エラー! for文の終わりが見つかりません");

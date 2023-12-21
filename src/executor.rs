@@ -1,6 +1,6 @@
+use crate::get_file_contents;
 use std::io::{self, Write};
 use std::process::exit;
-use crate::get_file_contents;
 
 /// 標準入力を取得する
 pub fn input(prompt: &str) -> String {
@@ -42,7 +42,18 @@ pub enum ControlMode {
     For,
     While,
     Function,
+    Try,
+    Catch,
     Normal,
+}
+
+#[derive(Clone)]
+pub enum ReturnValue {
+    Some(Type),
+    None,
+    Error(String),
+    Break,
+    Next,
 }
 
 /// 実行モード
@@ -64,6 +75,7 @@ pub struct Executor<'a> {
     pub execution_mode: ExecutionMode,     // 制御ブロックの状態
     pub control_mode: ControlMode,         // 制御ブロックの状態
     pub nest_if: usize,                    // ifネストの階層を表す
+    pub nest_try: usize,                   // tryネストの階層を表す
     pub nest_for: usize,                   // forネストの階層を表す
     pub nest_while: usize,                 // whileネストの階層を表す
     pub nest_func: usize,                  // funcネストの階層を表す
@@ -86,6 +98,7 @@ impl<'a> Executor<'a> {
             control_mode: ControlMode::Normal,
             execution_mode: mode,
             nest_if: 0,
+            nest_try: 0,
             nest_for: 0,
             nest_while: 0,
             nest_func: 0,
@@ -93,7 +106,7 @@ impl<'a> Executor<'a> {
     }
 
     /// 文の実行
-    pub fn execute(&mut self, code: String) -> Option<Type> {
+    pub fn execute(&mut self, code: String) -> ReturnValue {
         match self.control_mode {
             ControlMode::For => {
                 if code.contains("end for") || code.contains("endfor") {
@@ -103,11 +116,16 @@ impl<'a> Executor<'a> {
                         self.stmt.push(code.to_string());
                     } else {
                         self.log_print(format!("ループ回数を求めます"));
-                        let count = if let Type::Number(i) = self.compute(self.expr.clone()) {
+                        let count = if let Type::Number(i) = match self.compute(self.expr.clone()) {
+                            ReturnValue::Some(i) => i,
+                            ReturnValue::Error(e) => return ReturnValue::Error(e),
+                            _ => Type::Number(0.0),
+                        } {
                             i.round() as usize
                         } else {
-                            self.log_print("エラー! ループ回数は数値型です".to_string());
-                            0
+                            return ReturnValue::Error(
+                                "エラー! ループ回数は数値型です".to_string(),
+                            );
                         };
                         for i in 0..count {
                             self.log_print(format!("{}回目のループ", i + 1));
@@ -119,22 +137,11 @@ impl<'a> Executor<'a> {
                             )
                             .execute_block(self.stmt.clone());
                             match status {
-                                Some(j) => {
-                                    if let Type::Number(k) = j {
-                                        if k == f64::MAX {
-                                            //状態がbreakの時はループを抜け出す
-                                            break;
-                                        } else if k == f64::MIN {
-                                            continue;
-                                        } else {
-                                            return Some(j);
-                                        }
-                                    } else {
-                                        // 戻り値を返す
-                                        return Some(j);
-                                    }
-                                }
-                                None => {}
+                                ReturnValue::Break => break,
+                                ReturnValue::Next => continue,
+                                ReturnValue::Some(n) => return ReturnValue::Some(n),
+                                ReturnValue::Error(n) => return ReturnValue::Error(n),
+                                ReturnValue::None => {}
                             }
                         } // モードを元に戻す
                         self.stmt = Vec::new();
@@ -160,7 +167,11 @@ impl<'a> Executor<'a> {
                         self.stmt.push(code.to_string());
                     } else {
                         self.log_print(format!("ifの条件式を評価します"));
-                        if let Type::Bool(true) = self.compute(self.expr.clone()) {
+                        if let Type::Bool(true) = match self.compute(self.expr.clone()) {
+                            ReturnValue::Some(i) => i,
+                            ReturnValue::Error(e) => return ReturnValue::Error(e),
+                            _ => Type::Number(0.0),
+                        } {
                             self.log_print(format!("条件が一致したので、実行します"));
 
                             let status = Executor::new(
@@ -170,11 +181,11 @@ impl<'a> Executor<'a> {
                             )
                             .execute_block(self.stmt.clone());
                             match status {
-                                Some(j) => {
-                                    // 戻り値を返す
-                                    return Some(j);
-                                }
-                                None => {}
+                                ReturnValue::Break => return ReturnValue::Break,
+                                ReturnValue::Next => return ReturnValue::Next,
+                                ReturnValue::Some(n) => return ReturnValue::Some(n),
+                                ReturnValue::Error(n) => return ReturnValue::Error(n),
+                                ReturnValue::None => {}
                             }
                             self.stmt = Vec::new();
                         } else {
@@ -198,7 +209,11 @@ impl<'a> Executor<'a> {
                         self.else_stmt.push(code.to_string());
                     } else {
                         self.log_print(format!("ifの条件式を評価します"));
-                        if let Type::Bool(true) = self.compute(self.expr.clone()) {
+                        if let Type::Bool(true) = match self.compute(self.expr.clone()) {
+                            ReturnValue::Some(i) => i,
+                            ReturnValue::Error(e) => return ReturnValue::Error(e),
+                            _ => Type::Number(0.0),
+                        } {
                             self.log_print(format!("条件が一致したので、実行します"));
 
                             let status = Executor::new(
@@ -208,11 +223,11 @@ impl<'a> Executor<'a> {
                             )
                             .execute_block(self.stmt.clone());
                             match status {
-                                Some(j) => {
-                                    // 戻り値を返す
-                                    return Some(j);
-                                }
-                                None => {}
+                                ReturnValue::Break => return ReturnValue::Break,
+                                ReturnValue::Next => return ReturnValue::Next,
+                                ReturnValue::Some(n) => return ReturnValue::Some(n),
+                                ReturnValue::Error(n) => return ReturnValue::Error(n),
+                                ReturnValue::None => {}
                             }
                             self.else_stmt = Vec::new();
                             self.stmt = Vec::new();
@@ -228,11 +243,11 @@ impl<'a> Executor<'a> {
                             )
                             .execute_block(self.else_stmt.clone());
                             match status {
-                                Some(j) => {
-                                    // 戻り値を返す
-                                    return Some(j);
-                                }
-                                None => {}
+                                ReturnValue::Break => return ReturnValue::Break,
+                                ReturnValue::Next => return ReturnValue::Next,
+                                ReturnValue::Some(n) => return ReturnValue::Some(n),
+                                ReturnValue::Error(n) => return ReturnValue::Error(n),
+                                ReturnValue::None => {}
                             }
                             self.else_stmt = Vec::new();
                             self.stmt = Vec::new();
@@ -254,7 +269,11 @@ impl<'a> Executor<'a> {
                     } else {
                         loop {
                             self.log_print(format!("whileの条件式を評価します"));
-                            if let Type::Bool(true) = self.compute(self.expr.clone()) {
+                            if let Type::Bool(true) = match self.compute(self.expr.clone()) {
+                                ReturnValue::Some(i) => i,
+                                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                                _ => Type::Number(0.0),
+                            } {
                                 self.log_print(format!("条件が一致したので、ループを継続します"));
                                 if let ExecutionMode::Interactive = self.execution_mode {
                                     self.execution_mode = ExecutionMode::Debug
@@ -266,22 +285,11 @@ impl<'a> Executor<'a> {
                                 )
                                 .execute_block(self.stmt.clone());
                                 match status {
-                                    Some(j) => {
-                                        if let Type::Number(k) = j {
-                                            if k == f64::MAX {
-                                                //状態がbreakの時はループを抜け出す
-                                                break;
-                                            } else if k == f64::MIN {
-                                                continue;
-                                            } else {
-                                                return Some(j);
-                                            }
-                                        } else {
-                                            // 戻り値を返す
-                                            return Some(j);
-                                        }
-                                    }
-                                    None => {}
+                                    ReturnValue::Break => break,
+                                    ReturnValue::Next => continue,
+                                    ReturnValue::Some(n) => return ReturnValue::Some(n),
+                                    ReturnValue::Error(n) => return ReturnValue::Error(n),
+                                    ReturnValue::None => {}
                                 }
                             } else {
                                 self.stmt = Vec::new();
@@ -319,6 +327,59 @@ impl<'a> Executor<'a> {
                 }
             }
 
+            ControlMode::Try => {
+                if code.contains("catch") {
+                    if self.nest_try > 0 {
+                        self.nest_try -= 1;
+                        self.stmt.push(code.to_string());
+                    } else {
+                        self.control_mode = ControlMode::Catch;
+                    }
+                } else if code.contains("try") {
+                    self.nest_try += 1;
+                    self.stmt.push(code.to_string());
+                } else {
+                    self.stmt.push(code.to_string());
+                }
+            }
+
+            ControlMode::Catch => {
+                if code.contains("end try") || code.contains("endtry") {
+                    if self.nest_try > 0 {
+                        self.nest_try -= 1;
+                        self.stmt.push(code.to_string());
+                    } else {
+                        self.log_print("エラーが起きそうなTryのコードを実行します".to_string());
+                        let status = Executor::new(
+                            &mut self.memory,
+                            &mut self.name_space,
+                            self.execution_mode.clone(),
+                        )
+                        .execute_block(self.stmt.clone());
+                        if let ReturnValue::Error(_) = status {
+                            self.log_print(
+                                "エラーが発生したので、Catchのコードを実行します".to_string(),
+                            );
+                            Executor::new(
+                                &mut self.memory,
+                                &mut self.name_space,
+                                self.execution_mode.clone(),
+                            )
+                            .execute_block(self.else_stmt.clone());
+                        } else {
+                            self.log_print("正常に実行されました".to_string());
+                        }
+                        self.stmt = Vec::new();
+                        self.control_mode = ControlMode::Normal;
+                    }
+                } else if code.contains("try") {
+                    self.nest_try += 1;
+                    self.else_stmt.push(code.to_string());
+                } else {
+                    self.else_stmt.push(code.to_string());
+                }
+            }
+
             ControlMode::Normal => {
                 if code.contains("var") {
                     // 変数の定義
@@ -328,7 +389,11 @@ impl<'a> Executor<'a> {
                     let name = params[0].trim();
                     let expr = params[1..].join("=").to_string();
                     if name.contains("[") {
-                        let value = self.compute(expr);
+                        let value = match self.compute(expr) {
+                            ReturnValue::Some(i) => i,
+                            ReturnValue::Error(e) => return ReturnValue::Error(e),
+                            _ => Type::Number(0.0),
+                        };
                         self.set_sequence_value(name.to_string(), value);
                     } else {
                         let name = name.replace(" ", "");
@@ -338,8 +403,9 @@ impl<'a> Executor<'a> {
                 } else if code.contains("func") {
                     //　関数の定義
                     if !code.contains("(") {
-                        println!("エラー! 関数にはカッコをつけてください");
-                        return None;
+                        return ReturnValue::Error(
+                            "エラー! 関数にはカッコをつけてください".to_string(),
+                        );
                     }
                     self.data = code.to_string();
                     let name: &String = &code
@@ -364,22 +430,27 @@ impl<'a> Executor<'a> {
                 } else if code.contains("if") {
                     self.expr = code.replacen("if", "", 1);
                     self.control_mode = ControlMode::If
+                } else if code.contains("try") {
+                    self.control_mode = ControlMode::Try
                 } else if code.contains("while") {
                     self.expr = code.replacen("while", "", 1);
                     self.control_mode = ControlMode::While;
-
                 } else if code.contains("import") {
                     let code = code.replacen("import", "", 1);
                     self.log_print(format!("モジュール{code}を読み込みます"));
                     let module = match get_file_contents(code) {
                         Ok(code) => code,
-                        Err(e) => {self.log_print(format!("エラー! {e}"));"".to_string()}
+                        Err(e) => return ReturnValue::Error(format!("エラー! {e}")),
                     };
 
                     let mode = self.execution_mode.clone();
                     match self.execution_mode {
-                        ExecutionMode::Script => {self.script(&module);},
-                        ExecutionMode::Debug | ExecutionMode::Interactive => {self.debugger(&module);}
+                        ExecutionMode::Script => {
+                            self.script(&module);
+                        }
+                        ExecutionMode::Debug | ExecutionMode::Interactive => {
+                            self.debugger(&module);
+                        }
                     }
                     self.execution_mode = mode;
                 } else if code.contains("print") {
@@ -419,26 +490,29 @@ impl<'a> Executor<'a> {
                 } else if code.contains("return") {
                     let return_value = code.replacen("return", "", 1);
                     self.log_print(format!("戻り値を返します"));
-                    return Some(self.compute(return_value));
+                    return self.compute(return_value);
                 } else if code.contains("break") {
                     self.log_print(format!("ループを脱出します"));
-                    return Some(Type::Number(f64::MAX)); //ステータスコード
+                    return ReturnValue::Break;
                 } else if code.contains("next") {
                     self.log_print(format!("次のループへ移ります"));
-                    return Some(Type::Number(f64::MIN)); //ステータスコード
+                    return ReturnValue::Next; //ステータスコード
                 } else if code == "exit" {
                     self.log_print(format!("プロセスを終了します"));
                     exit(0)
                 } else {
-                    self.compute(code);
+                    match self.compute(code) {
+                        ReturnValue::Error(e) => return ReturnValue::Error(e),
+                        _ => {}
+                    };
                 }
             }
         }
-        return None;
+        return ReturnValue::None;
     }
 
     /// ブロックを実行
-    pub fn execute_block(&mut self, code: Vec<String>) -> Option<Type> {
+    pub fn execute_block(&mut self, code: Vec<String>) -> ReturnValue {
         let mut number = 0;
         for lin in code.iter() {
             let lin = if let ControlMode::Normal = self.control_mode {
@@ -489,12 +563,16 @@ impl<'a> Executor<'a> {
                 }
             }
 
-            if let Some(i) = status {
+            if let ReturnValue::Some(i) = status {
                 // 戻り値を返す
-                return Some(i);
+                return ReturnValue::Some(i);
+            }
+
+            if let ReturnValue::Error(e) = status {
+                return ReturnValue::Error(e);
             }
         }
-        return None;
+        return ReturnValue::None;
     }
 
     /// REPLで対話的に実行する
@@ -507,6 +585,8 @@ impl<'a> Executor<'a> {
                     match self.control_mode {
                         ControlMode::If => "If分岐",
                         ControlMode::Else => "Else分岐",
+                        ControlMode::Try => "Try文",
+                        ControlMode::Catch => "Catch文",
                         ControlMode::For => "Forループ",
                         ControlMode::While => "Whileループ",
                         ControlMode::Normal => "プログラム",
@@ -551,14 +631,14 @@ impl<'a> Executor<'a> {
     }
 
     /// スクリプトを実行する
-    pub fn script(&mut self, code: &String) -> Option<Type> {
+    pub fn script(&mut self, code: &String) -> ReturnValue {
         self.execution_mode = ExecutionMode::Script;
         let code: Vec<String> = code.split("\n").map(|x| x.to_string()).collect();
         self.execute_block(code)
     }
 
     /// ファイルをデバッグする
-    pub fn debugger(&mut self, code: &String) -> Option<Type> {
+    pub fn debugger(&mut self, code: &String) -> ReturnValue {
         self.execution_mode = ExecutionMode::Debug;
         self.execute_block(code.split("\n").map(|x| x.to_string()).collect())
     }
@@ -691,63 +771,87 @@ impl<'a> Executor<'a> {
     }
 
     /// シーケンス型の値を得る
-    fn get_sequence_value(&mut self, item: Type, index: String) -> Type {
+    fn get_sequence_value(&mut self, item: Type, index: String) -> ReturnValue {
         if let Type::List(ref sequence) = item {
-            let index = if let Type::Number(i) = self.compute(index.clone()) {
+            let index = if let Type::Number(i) = match self.compute(index.clone()) {
+                ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => Type::Number(0.0),
+            } {
                 let j = i as usize;
                 self.log_print(format!("インデックス{i}の値を求めます"));
                 if j < sequence.len() {
                     j
                 } else {
                     self.log_print(format!("エラー! {i}はインデックス範囲外です"));
-                    return Type::Number(0.0);
+                    return ReturnValue::Error(format!("エラー! {i}はインデックス範囲外です"));
                 }
             } else {
-                if let Type::String(is) = self.compute(index.clone()) {
+                if let Type::String(is) = match self.compute(index.clone()) {
+                    ReturnValue::Some(i) => i,
+                    ReturnValue::Error(e) => return ReturnValue::Error(e),
+                    _ => Type::Number(0.0),
+                } {
                     self.log_print(format!("リストの長さを求めます"));
                     if is.contains("len") {
                         if let Type::List(l) = item {
-                            return Type::Number(l.clone().len() as f64);
+                            return ReturnValue::Some(Type::Number(l.clone().len() as f64));
                         }
                     }
                 }
 
                 self.log_print(format!("エラー! インデックスは数値型です"));
-                return Type::Number(0.0);
+                return ReturnValue::Error(format!("エラー! インデックスは数値型です"));
             };
-            return sequence[index].clone();
+            return ReturnValue::Some(sequence[index].clone());
         }
         if let Type::String(ref string) = item {
-            let index: usize = if let Type::Number(i) = self.compute(index.clone()) {
+            let index: usize = if let Type::Number(i) = match self.compute(index.clone()) {
+                ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => Type::Number(0.0),
+            } {
                 let j: usize = i as usize;
                 self.log_print(format!("'{string}'のインデックス{i}の文字を求めます"));
                 if j < string.chars().count() {
                     j
                 } else {
                     self.log_print(format!("エラー! {i}はインデックス範囲外です"));
-                    return Type::Number(0.0);
+                    return ReturnValue::Error(format!("エラー! {i}はインデックス範囲外です"));
                 }
             } else {
-                if let Type::String(is) = self.compute(index.clone()) {
+                if let Type::String(is) = match self.compute(index.clone()) {
+                    ReturnValue::Some(i) => i,
+                    ReturnValue::Error(e) => return ReturnValue::Error(e),
+                    _ => Type::Number(0.0),
+                } {
                     self.log_print(format!("文字列の長さを求めます"));
                     if is.contains("len") {
                         if let Type::String(m) = item {
-                            return Type::Number(m.clone().chars().count() as f64);
+                            return ReturnValue::Some(Type::Number(
+                                m.clone().chars().count() as f64
+                            ));
                         }
                     }
                 }
 
                 self.log_print(format!("エラー! インデックスは数値型です"));
-                return Type::Number(0.0);
+                return ReturnValue::Error(format!("エラー! インデックスは数値型です"));
             };
-            return Type::String(string.chars().collect::<Vec<char>>()[index].to_string());
+            return ReturnValue::Some(Type::String(
+                string.chars().collect::<Vec<char>>()[index].to_string(),
+            ));
         } else {
-            return self.compute(index.clone());
+            return ReturnValue::Some(match self.compute(index.clone()) {
+                ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => Type::Number(0.0),
+            });
         }
     }
 
     /// シーケンス型の値をセットする
-    fn set_sequence_value(&mut self, item: String, value: Type) {
+    fn set_sequence_value(&mut self, item: String, value: Type) -> ReturnValue {
         let new_lines: Vec<String> = item
             .trim()
             .replace("]", "")
@@ -761,18 +865,22 @@ impl<'a> Executor<'a> {
         match self.get_variable_value(name.clone()) {
             Type::List(mut sequence) => {
                 let len = sequence.len();
-                sequence[if let Type::Number(i) = index {
+                sequence[if let Type::Number(i) = match index {
+                    ReturnValue::Some(i) => i,
+                    ReturnValue::Error(e) => return ReturnValue::Error(e),
+                    _ => Type::Number(0.0),
+                } {
                     let i = i as usize;
                     self.log_print(format!("インデックス{i}の値を変更します"));
                     if i < len {
                         i
                     } else {
                         self.log_print(format!("エラー! {i}はインデックス範囲外です"));
-                        return;
+                        return ReturnValue::Error(format!("エラー! {i}はインデックス範囲外です"));
                     }
                 } else {
                     self.log_print(format!("エラー! インデックスは数値型です"));
-                    0
+                    return ReturnValue::Error(format!("エラー! インデックスは数値型です"));
                 }] = value.clone();
                 self.memory[address].value = Type::List(sequence);
             }
@@ -781,14 +889,18 @@ impl<'a> Executor<'a> {
                     .chars()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>();
-                vec[if let Type::Number(i) = index {
+                vec[if let Type::Number(i) = match index {
+                    ReturnValue::Some(i) => i,
+                    ReturnValue::Error(e) => return ReturnValue::Error(e),
+                    _ => Type::Number(0.0),
+                } {
                     let i: usize = i as usize;
                     self.log_print(format!("'{string}'のインデックス{i}の値を変更します"));
                     if i < string.chars().count() {
                         i
                     } else {
                         self.log_print(format!("エラー! {i}はインデックス範囲外です"));
-                        0
+                        return ReturnValue::Error(format!("エラー! {i}はインデックス範囲外です"));
                     }
                 } else {
                     0
@@ -811,12 +923,17 @@ impl<'a> Executor<'a> {
                 };
                 self.memory[address].value = Type::String(vec.join(""));
             }
-            _ => self.log_print(format!("エラー! スライスは文字列型やリスト型のみ有効です")),
+            _ => {
+                return ReturnValue::Error(format!(
+                    "エラー! スライスは文字列型やリスト型のみ有効です"
+                ))
+            }
         }
+        return ReturnValue::None;
     }
 
     /// シーケンス型の値を削除する
-    fn del_sequence_value(&mut self, item: String) {
+    fn del_sequence_value(&mut self, item: String) -> ReturnValue {
         let new_lines: Vec<String> = item
             .trim()
             .replace("]", "")
@@ -827,22 +944,22 @@ impl<'a> Executor<'a> {
         if let Type::List(mut sequence) = self.get_variable_value(name.clone()) {
             let len = sequence.len();
             sequence.remove(
-                if let Type::Number(i) = self.compute(new_lines[1].clone()) {
+                if let Type::Number(i) = match self.compute(new_lines[1].clone()) {
+                    ReturnValue::Some(i) => i,
+                    ReturnValue::Error(e) => return ReturnValue::Error(e),
+                    _ => Type::Number(0.0),
+                } {
                     let j = i as usize;
                     self.log_print(format!("インデックス{i}の値を削除します"));
                     if j < len {
                         j
                     } else {
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!("エラー! {i}はインデックス範囲外です");
-                            return;
-                        };
-                        0
+                        self.log_print(format!("エラー! {i}はインデックス範囲外です"));
+                        return ReturnValue::Error(format!("エラー! {i}はインデックス範囲外です"));
                     }
                 } else {
                     self.log_print(format!("エラー! インデックスは数値型です"));
-                    return;
+                    return ReturnValue::Error(format!("エラー! インデックスは数値型です"));
                 },
             );
             let address = self.reference_variable(name.clone()).unwrap_or(0);
@@ -855,7 +972,11 @@ impl<'a> Executor<'a> {
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>();
             vec.remove(
-                if let Type::Number(i) = self.compute(new_lines[1].clone()) {
+                if let Type::Number(i) = match self.compute(new_lines[1].clone()) {
+                    ReturnValue::Some(i) => i,
+                    ReturnValue::Error(e) => return ReturnValue::Error(e),
+                    _ => Type::Number(0.0),
+                } {
                     let j = i as usize;
                     self.log_print(format!("インデックス{i}の値を削除します"));
                     if j < len {
@@ -863,19 +984,21 @@ impl<'a> Executor<'a> {
                     } else {
                         if let ExecutionMode::Script = self.execution_mode {
                         } else {
-                            println!("エラー! {i}はインデックス範囲外です");
-                            return;
+                            return ReturnValue::Error(format!(
+                                "エラー! {i}はインデックス範囲外です"
+                            ));
                         };
                         0
                     }
                 } else {
                     self.log_print(format!("エラー! インデックスは数値型です"));
-                    return;
+                    return ReturnValue::Error(format!("エラー! インデックスは数値型です"));
                 },
             );
             let address = self.reference_variable(name.clone()).unwrap_or(0);
             self.memory[address].value = Type::String(vec.join(""));
         }
+        return ReturnValue::None;
     }
 
     /// 引数のトークンを整える
@@ -931,7 +1054,7 @@ impl<'a> Executor<'a> {
     }
 
     /// 標準ライブラリを呼び出す
-    fn call_stdlib(&mut self, item: String) -> Option<Type> {
+    fn call_stdlib(&mut self, item: String) -> ReturnValue {
         let params: Vec<&str> = item[..item.len() - 1].split("(").collect();
         let name = params[0].to_string();
         let mut args = self.tokenize_arguments(params[1..].join("(").as_str());
@@ -943,79 +1066,77 @@ impl<'a> Executor<'a> {
         //　入力
         if name == "input" {
             self.log_print(format!("標準ライブラリのinput関数を呼び出します"));
-            return Some(Type::String(self.input(args[0].clone())));
+            return self.input(args[0].clone());
         }
 
         //　出力
         if name == "print" {
             self.log_print(format!("標準ライブラリのprint関数を呼び出します"));
-            self.print(args[0].clone());
-            return Some(Type::Bool(true));
+            return self.print(args[0].clone());
         }
 
         //　現在時刻
         if name == "time.now" {
             self.log_print(format!("標準ライブラリのtime.now関数を呼び出します"));
-            return Some(Type::Number(self.time_now()));
+            return self.time_now();
         }
 
         //　スリープ
         if name == "time.sleep" {
             self.log_print(format!("標準ライブラリのtime.sleep関数を呼び出します"));
-            self.time_sleep(args[0].clone());
-            return Some(Type::Bool(true));
+            return self.time_sleep(args[0].clone());
         }
 
         // 参照
         if name == "ref" {
             self.log_print(format!("標準ライブラリのref関数を呼び出します"));
-            return Some(Type::Number(self.refer(args[0].clone())));
+            return self.refer(args[0].clone());
         }
 
         //　指定したメモリアドレスにアクセス
         if name == "access" {
             self.log_print(format!("標準ライブラリのaccess関数を呼び出します"));
-            return Some(self.access(args[0].clone()));
+            return self.access(args[0].clone());
         }
 
         // データ型を判定
         if name == "type" {
             self.log_print(format!("標準ライブラリのtype関数を呼び出します"));
-            return Some(self.types(args[0].clone()));
+            return self.types(args[0].clone());
         }
 
         // 文字列に変換
         if name == "string" {
             self.log_print(format!("標準ライブラリのstring関数を呼び出します"));
-            return Some(Type::String(self.string(args[0].clone())));
+            return self.string(args[0].clone());
         }
 
         // 数値に変換
         if name == "number" {
             self.log_print(format!("標準ライブラリのnumber関数を呼び出します"));
-            return Some(Type::Number(self.number(args[0].clone())));
+            return self.number(args[0].clone());
         }
 
         // 論理値に変換
         if name == "bool" {
             self.log_print(format!("標準ライブラリのbool関数を呼び出します"));
-            return Some(Type::Bool(self.bool(args[0].clone())));
+            return self.bool(args[0].clone());
         }
 
         // リストを作成
         if name == "list" {
             self.log_print(format!("標準ライブラリのlist関数を呼び出します"));
-            return Some(Type::List(self.list(args.join(",").clone())));
+            return self.list(args.join(",").clone());
         }
 
-        return None;
+        return ReturnValue::None;
     }
 
     ///　ユーザー定義関数を呼び出す
-    fn call_function(&mut self, item: String) -> Type {
+    fn call_function(&mut self, item: String) -> ReturnValue {
         if !item.contains("(") {
-            println!("エラー! 関数にはカッコをつけてください");
-            return Type::Number(0.0);
+            self.log_print("エラー! 関数にはカッコをつけてください".to_string());
+            return ReturnValue::Error("エラー! 関数にはカッコをつけてください".to_string());
         }
         let params: Vec<&str> = item[..item.len() - 1].split("(").collect::<Vec<&str>>();
 
@@ -1033,7 +1154,10 @@ impl<'a> Executor<'a> {
                     .as_str(),
             )
             .iter()
-            .map(|s| self.compute(s.to_string()))
+            .map(|s| match self.compute(s.to_string()) {
+                ReturnValue::Some(i) => i,
+                _ => Type::Number(0.0),
+            })
             .collect();
 
         let name = func_name
@@ -1047,7 +1171,7 @@ impl<'a> Executor<'a> {
 
         let code = match self.get_function(name.clone()) {
             Some(func) => func.code,
-            None => return Type::Number(0.0),
+            None => return ReturnValue::None,
         };
 
         let function_args = self.get_function(name.clone()).unwrap().args.clone();
@@ -1092,10 +1216,7 @@ impl<'a> Executor<'a> {
         if let ExecutionMode::Interactive = instance.execution_mode {
             instance.execution_mode = ExecutionMode::Debug
         }
-        match instance.execute_block(code) {
-            Some(indes) => indes,
-            None => Type::Number(0.0),
-        }
+        return instance.execute_block(code);
     }
 
     /// 関数を定義する
@@ -1180,12 +1301,18 @@ impl<'a> Executor<'a> {
             //　変数が在る場合は更新する
             let address = self.reference_variable(name.clone()).unwrap_or(0);
             self.log_print(format!("値を求めます"));
-            self.memory[address].value = self.compute(expr.clone());
+            self.memory[address].value = match self.compute(expr.clone()) {
+                ReturnValue::Some(i) => i,
+                _ => Type::Number(0.0),
+            };
             self.log_print(format!("変数データを更新しました"));
         } else {
             //ない場合は新規に確保する
             self.log_print(format!("値を求めます"));
-            let value = self.compute(expr.clone());
+            let value = match self.compute(expr.clone()) {
+                ReturnValue::Some(i) => i,
+                _ => Type::Number(0.0),
+            };
             self.memory.push(Variable {
                 name: name.clone(),
                 value: value,
@@ -1247,7 +1374,7 @@ impl<'a> Executor<'a> {
     }
 
     /// 式の計算
-    pub fn compute(&mut self, expr: String) -> Type {
+    pub fn compute(&mut self, expr: String) -> ReturnValue {
         /// 式をトークンに分ける
         fn tokenize_expression(expr: &str) -> Vec<String> {
             let mut elements = Vec::new();
@@ -1325,8 +1452,12 @@ impl<'a> Executor<'a> {
             // 関数を呼び出す
             if item.contains("(") && item.contains(")") {
                 stack.push(match self.call_stdlib(item.to_string()) {
-                    Some(i) => i,
-                    None =>self.call_function(item.to_string()),
+                    ReturnValue::Some(i) => i,
+                    ReturnValue::None => match self.call_function(item.to_string()) {
+                        ReturnValue::Some(i) => i,
+                        _ => Type::Number(0.0),
+                    },
+                    _ => Type::Number(0.0),
                 });
                 continue;
             }
@@ -1352,13 +1483,17 @@ impl<'a> Executor<'a> {
                             if item.contains("[") && item.contains("]") {
                                 stack.push(x);
                                 stack.push(
-                                    self.get_sequence_value(
+                                    match self.get_sequence_value(
                                         y,
                                         item[..item.len() - 1]
                                             .to_string()
                                             .replacen("[", "", 1)
                                             .to_string(),
-                                    ),
+                                    ) {
+                                        ReturnValue::Some(i) => i,
+                                        ReturnValue::Error(e) => return ReturnValue::Error(e),
+                                        _ => Type::Number(0.0),
+                                    },
                                 );
                                 continue;
                             }
@@ -1430,7 +1565,13 @@ impl<'a> Executor<'a> {
                                         "~" => {
                                             stack.push(Type::Number(x));
 
-                                            stack.push(self.access(y.to_string()));
+                                            stack.push(match self.access(y.to_string()) {
+                                                ReturnValue::Some(i) => i,
+                                                ReturnValue::Error(e) => {
+                                                    return ReturnValue::Error(e)
+                                                }
+                                                _ => Type::Number(0.0),
+                                            });
                                             continue;
                                         }
                                         _ => {
@@ -1476,7 +1617,10 @@ impl<'a> Executor<'a> {
                                     }
                                 }
                                 _ => {
-                                    println!("エラー!型が一致しません")
+                                    self.log_print("エラー!型が一致しません".to_string());
+                                    return ReturnValue::Error(
+                                        "エラー!型が一致しません".to_string(),
+                                    );
                                 }
                             }
                         } else if stack.len() == 1 {
@@ -1489,13 +1633,17 @@ impl<'a> Executor<'a> {
                             // リストの値を得る
                             if item.contains("[") && item.contains("]") {
                                 stack.push(
-                                    self.get_sequence_value(
+                                    match self.get_sequence_value(
                                         y,
                                         item[..item.len() - 1]
                                             .to_string()
                                             .replacen("[", "", 1)
                                             .to_string(),
-                                    ),
+                                    ) {
+                                        ReturnValue::Some(i) => i,
+                                        ReturnValue::Error(e) => return ReturnValue::Error(e),
+                                        _ => Type::Number(0.0),
+                                    },
                                 );
                                 continue;
                             }
@@ -1521,7 +1669,11 @@ impl<'a> Executor<'a> {
                                         }
                                     };
 
-                                    stack.push(self.access(y.to_string()));
+                                    stack.push(match self.access(y.to_string()) {
+                                        ReturnValue::Some(i) => i,
+                                        ReturnValue::Error(e) => return ReturnValue::Error(e),
+                                        _ => Type::Number(0.0),
+                                    });
                                     continue;
                                 }
 
@@ -1559,6 +1711,6 @@ impl<'a> Executor<'a> {
         let value = self.type_string(result.clone());
         self.log_print(format!("結果 = {}", value));
 
-        return result;
+        return ReturnValue::Some(result);
     }
 }
