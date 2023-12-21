@@ -475,7 +475,9 @@ impl<'a> Executor<'a> {
                     let text = self
                         .tokenize_arguments(code.replacen("print", "", 1).as_str())
                         .join(",");
-                    self.print(text);
+                    if let ReturnValue::Error(e) = self.print(text) {
+                        return ReturnValue::Error(e);
+                    }
                 } else if code.contains("mem") {
                     self.show_memory()
                 } else if code.contains("del") {
