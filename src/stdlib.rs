@@ -111,7 +111,7 @@ impl<'a> Executor<'a> {
     /// 数値型に変換
     pub fn number(&mut self, arg: String) -> ReturnValue {
         self.log_print("数値型に変換します".to_string());
-        return ReturnValue::Some(Type::Number(
+        let value = ReturnValue::Some(Type::Number(
             match match self.compute(arg) {
                 ReturnValue::Some(i) => i,
                 ReturnValue::Error(e) => return ReturnValue::Error(e),
@@ -139,6 +139,7 @@ impl<'a> Executor<'a> {
                 }
             },
         ));
+        return value;
     }
 
     /// 論理型に変換

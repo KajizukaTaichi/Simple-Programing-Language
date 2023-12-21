@@ -356,20 +356,34 @@ impl<'a> Executor<'a> {
                             self.execution_mode.clone(),
                         )
                         .execute_block(self.stmt.clone());
-                        if let ReturnValue::Error(_) = status {
-                            self.log_print(
-                                "エラーが発生したので、Catchのコードを実行します".to_string(),
-                            );
-                            Executor::new(
-                                &mut self.memory,
-                                &mut self.name_space,
-                                self.execution_mode.clone(),
-                            )
-                            .execute_block(self.else_stmt.clone());
-                        } else {
-                            self.log_print("正常に実行されました".to_string());
+                        match status {
+                            ReturnValue::Break => return ReturnValue::Break,
+                            ReturnValue::Next => return ReturnValue::Next,
+                            ReturnValue::Some(n) => return ReturnValue::Some(n),
+                            ReturnValue::Error(_) => {
+                                self.log_print(
+                                    "エラーが発生したので、Catchのコードを実行します".to_string(),
+                                );
+                                let status = Executor::new(
+                                    &mut self.memory,
+                                    &mut self.name_space,
+                                    self.execution_mode.clone(),
+                                )
+                                .execute_block(self.else_stmt.clone());
+                                match status {
+                                    ReturnValue::Break => return ReturnValue::Break,
+                                    ReturnValue::Next => return ReturnValue::Next,
+                                    ReturnValue::Some(n) => return ReturnValue::Some(n),
+                                    ReturnValue::Error(e) => return ReturnValue::Error(e),
+                                    ReturnValue::None => {}
+                                }
+                            }
+                            ReturnValue::None => {
+                                self.log_print("正常に実行されました".to_string());
+                            }
                         }
                         self.stmt = Vec::new();
+                        self.else_stmt = Vec::new();
                         self.control_mode = ControlMode::Normal;
                     }
                 } else if code.contains("try") {
@@ -398,11 +412,14 @@ impl<'a> Executor<'a> {
                     } else {
                         let name = name.replace(" ", "");
                         self.log_print(format!("変数{}を定義します", name));
-                        self.set_variable(name, expr);
+                        if let ReturnValue::Error(e) = self.set_variable(name, expr) {
+                            return ReturnValue::Error(e);
+                        };
                     }
                 } else if code.contains("func") {
                     //　関数の定義
                     if !code.contains("(") {
+                        self.log_print("エラー! 関数にはカッコをつけてください".to_string());
                         return ReturnValue::Error(
                             "エラー! 関数にはカッコをつけてください".to_string(),
                         );
@@ -563,13 +580,12 @@ impl<'a> Executor<'a> {
                 }
             }
 
-            if let ReturnValue::Some(i) = status {
-                // 戻り値を返す
-                return ReturnValue::Some(i);
-            }
-
-            if let ReturnValue::Error(e) = status {
-                return ReturnValue::Error(e);
+            match status {
+                ReturnValue::Some(i) => return ReturnValue::Some(i),
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                ReturnValue::Next => return ReturnValue::Next,
+                ReturnValue::Break => return ReturnValue::Break,
+                ReturnValue::None => {}
             }
         }
         return ReturnValue::None;
@@ -1284,7 +1300,7 @@ impl<'a> Executor<'a> {
     }
 
     /// 変数の値をセットする
-    fn set_variable(&mut self, name: String, expr: String) {
+    fn set_variable(&mut self, name: String, expr: String) -> ReturnValue {
         let name = name.trim().replace(" ", "").replace("　", "");
         let is_duplicate = {
             //変数が既に在るか？
@@ -1303,6 +1319,7 @@ impl<'a> Executor<'a> {
             self.log_print(format!("値を求めます"));
             self.memory[address].value = match self.compute(expr.clone()) {
                 ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
                 _ => Type::Number(0.0),
             };
             self.log_print(format!("変数データを更新しました"));
@@ -1311,6 +1328,7 @@ impl<'a> Executor<'a> {
             self.log_print(format!("値を求めます"));
             let value = match self.compute(expr.clone()) {
                 ReturnValue::Some(i) => i,
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
                 _ => Type::Number(0.0),
             };
             self.memory.push(Variable {
@@ -1319,6 +1337,7 @@ impl<'a> Executor<'a> {
             });
             self.log_print(format!("メモリに変数を確保しました"));
         }
+        return ReturnValue::None;
     }
 
     /// 変数を取得する
@@ -1455,8 +1474,10 @@ impl<'a> Executor<'a> {
                     ReturnValue::Some(i) => i,
                     ReturnValue::None => match self.call_function(item.to_string()) {
                         ReturnValue::Some(i) => i,
+                        ReturnValue::Error(e) => return ReturnValue::Error(e),
                         _ => Type::Number(0.0),
                     },
+                    ReturnValue::Error(e) => return ReturnValue::Error(e),
                     _ => Type::Number(0.0),
                 });
                 continue;

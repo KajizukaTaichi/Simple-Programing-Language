@@ -6,13 +6,18 @@ print'Build on Simple programing language'
 while true
     #無限に入力を受け付ける
     var enter = input("数値を入力して判定>>> ")
-    var target = number(enter)
-
-    if enter exit =　
-        print'終了します'
-        break
-    end if
-
+    
+    try
+        var target = number(enter)
+    catch
+        if enter "exit" =　
+            print'終了します'
+            break
+        end if
+        print "文字列は判定できません
+        next
+    end try
+    
     var ptr = ref(target) #targetの参照
     
     #prime関数を呼び出す
