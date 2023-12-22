@@ -1162,7 +1162,9 @@ impl<'a> Executor<'a> {
 
         self.log_print(format!("引数の値を求めます"));
 
-        let args_value: Vec<Type> = self
+        let mut args_value = Vec::new();
+
+        for s in self
             .tokenize_arguments(
                 params[1..]
                     .iter()
@@ -1172,11 +1174,14 @@ impl<'a> Executor<'a> {
                     .as_str(),
             )
             .iter()
-            .map(|s| match self.compute(s.to_string()) {
+        {
+            let computed_value = match self.compute(s.to_string()) {
                 ReturnValue::Some(i) => i,
-                _ => Type::Number(0.0),
-            })
-            .collect();
+                ReturnValue::Error(e) => return ReturnValue::Error(e),
+                _ => return ReturnValue::Error("エラー! 引数の値が不正です".to_string()),
+            };
+            args_value.push(computed_value);
+        }
 
         let name = func_name
             .replacen("call", "", 1)
@@ -1203,7 +1208,7 @@ impl<'a> Executor<'a> {
                 }
                 Type::Number(f) => pre.push(format!("var {i} = {f}")),
                 Type::List(l) => pre.push(format!(
-                    "var {i} = sequence({})",
+                    "var {i} = list({})",
                     l.iter()
                         .map(|x| match x {
                             Type::Number(i) => i.to_string(),
