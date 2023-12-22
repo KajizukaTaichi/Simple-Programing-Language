@@ -1,0 +1,7 @@
+import library.smp
+
+print "文字列並べ替えプログラム
+while true
+    var words = split(input("文字列をカンマ区切りで入力"), ",")
+    print sort(words)
+end while

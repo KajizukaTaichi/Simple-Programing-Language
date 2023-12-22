@@ -39,3 +39,37 @@ func prime(ptr)
 
     return true #戻り値は論理型
 end func
+
+func sort(array)
+    var i = 0
+    while i array [len] <
+        var j = i 1 +
+        while j array [len] <
+            if array [i] array [j] >
+                var temp = array [i]
+                var array [i] = array [j]
+                var array [j] = temp
+            end if
+            var j = j 1 +
+        end while
+        var i = i 1 +
+    end while
+    return array
+end func 
+
+func split(word, key)
+    var index = 0
+    var result = list("")
+    var level = 0
+    while index word [len] <
+        if word [index] key =
+            var level = level 1 +
+            var result = result list("") +
+            var index = index 1 +
+            next
+        end if
+        var result [level] = result [level] word [index] +
+        var index = index 1 +
+    end while
+    return result
+end func 
