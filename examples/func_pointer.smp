@@ -1,0 +1,5 @@
+func sum(a,b)
+    return a b +
+end func
+
+print (sum (sum, 7))

@@ -11,27 +11,28 @@ pub fn input(prompt: &str) -> String {
     return result.trim().parse().ok().unwrap_or("".to_string());
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Type {
     Number(f64),
     String(String),
     Bool(bool),
     List(Vec<Type>),
+    Function(usize),
 }
 
 /// 変数のデータ
 #[derive(Clone)]
 pub struct Variable {
-    name: String,
+    pub name: String,
     pub value: Type,
 }
 
 /// 関数のデータ
 #[derive(Clone)]
 pub struct Function {
-    name: String,
-    args: Vec<String>,
-    code: Vec<String>,
+    pub name: String,
+    pub args: Vec<String>,
+    pub code: Vec<String>,
 }
 
 /// 制御モード
@@ -315,7 +316,25 @@ impl<'a> Executor<'a> {
                         self.nest_func -= 1;
                         self.stmt.push(code.to_string());
                     } else {
-                        self.set_function(self.data.clone(), self.stmt.clone());
+                        let token = self.tokenize_arguments(
+                            self.data
+                                .clone()
+                                .replace(")", "")
+                                .split("(")
+                                .collect::<Vec<&str>>()[1],
+                        );
+                        self.declaration_function(Function {
+                            name: self
+                                .data
+                                .clone()
+                                .replacen("func", "", 1)
+                                .split("(")
+                                .collect::<Vec<&str>>()[0]
+                                .trim()
+                                .to_string(),
+                            args: token,
+                            code: self.stmt.clone(),
+                        });
                         self.stmt = Vec::new();
                         self.control_mode = ControlMode::Normal;
                     }
@@ -412,7 +431,11 @@ impl<'a> Executor<'a> {
                     } else {
                         let name = name.replace(" ", "");
                         self.log_print(format!("変数{}を定義します", name));
-                        if let ReturnValue::Error(e) = self.set_variable(name, expr) {
+                        let value = match self.compute(params[1..].join("=").to_string()) {
+                            ReturnValue::Some(i) => i,
+                            _ => Type::Number(0.0),
+                        };
+                        if let ReturnValue::Error(e) = self.set_variable(name, value) {
                             return ReturnValue::Error(e);
                         };
                     }
@@ -437,9 +460,6 @@ impl<'a> Executor<'a> {
 
                     self.log_print(format!("関数{}を定義します", name));
                     self.control_mode = ControlMode::Function;
-                } else if code.contains("call") {
-                    // 関数呼び出し
-                    self.call_function(code.to_string());
                 } else if code.contains("for") {
                     let new_code = code.replacen("for", "", 1);
                     self.expr = new_code;
@@ -470,14 +490,6 @@ impl<'a> Executor<'a> {
                         }
                     }
                     self.execution_mode = mode;
-                } else if code.contains("print") {
-                    //　標準出力
-                    let text = self
-                        .tokenize_arguments(code.replacen("print", "", 1).as_str())
-                        .join(",");
-                    if let ReturnValue::Error(e) = self.print(text) {
-                        return ReturnValue::Error(e);
-                    }
                 } else if code.contains("mem") {
                     self.show_memory()
                 } else if code.contains("del") {
@@ -669,10 +681,12 @@ impl<'a> Executor<'a> {
                 let lim = &menu.replacen("var", "", 1);
                 let params: Vec<&str> = lim.split("=").collect();
 
-                self.set_variable(
-                    params[0].trim().replace(" ", ""),
-                    params[1..].join("=").to_string(),
-                );
+                let value = match self.compute(params[1..].join("=").to_string()) {
+                    ReturnValue::Some(i) => i,
+                    _ => Type::Number(0.0),
+                };
+
+                self.set_variable(params[0].trim().replace(" ", ""), value);
             } else if menu.contains("del") {
                 // 変数や関数の削除
                 let new_lines = menu.replacen("del", "", 1);
@@ -702,7 +716,11 @@ impl<'a> Executor<'a> {
                     let address = self.reference_variable(params[1..].join("=").to_string());
                     if let Some(i) = address {
                         self.log_print(format!("変数{}のアドレスは{}です", params[0], i));
-                        self.set_variable(params[0].to_string(), i.to_string());
+                        let value = match self.compute(i.to_string()) {
+                            ReturnValue::Some(v) => v,
+                            _ => Type::Number(0.0),
+                        };
+                        self.set_variable(params[0].to_string(), value);
                     }
                 } else {
                     let address = self.reference_variable(lines.clone());
@@ -727,58 +745,6 @@ impl<'a> Executor<'a> {
         if let ExecutionMode::Script = self.execution_mode {
         } else {
             println!("{text}");
-        }
-    }
-
-    /// メモリを表示
-    fn show_memory(&mut self) {
-        let mut name_max_len = 0;
-        for i in self.memory.iter() {
-            if name_max_len < i.name.len() {
-                name_max_len = i.name.len()
-            }
-        }
-
-        let mut value_max_len = 0;
-        for item in self.memory.iter() {
-            if let Type::Number(i) = item.value {
-                if value_max_len < i.to_string().len() {
-                    value_max_len = i.to_string().len()
-                }
-            }
-        }
-
-        if !self.memory.is_empty() {
-            self.log_print(format!("+-- メモリ内の変数"));
-            let len = self.memory.len();
-            for index in 0..len {
-                let vars = self.memory[index].clone();
-                let value = self.type_string(vars.value.clone());
-                println!("| [{:>3}] {:<name_max_len$} :{}", index, vars.name, value);
-            }
-        } else {
-            self.log_print(format!("変数がありません"));
-        }
-        if !self.name_space.is_empty() {
-            self.log_print(format!("+-- メモリ内の関数"));
-            for i in self.name_space.iter() {
-                self.log_print(format!("| +--  {} ({}) ", i.name, i.args.join(", ")));
-                let mut number = 0; //行数
-                for j in i.code.iter() {
-                    if j != "" {
-                        number += 1;
-                        if let ExecutionMode::Script = self.execution_mode {
-                        } else {
-                            println!(
-                                "| | {number:>len$}: {j}",
-                                len = i.code.len().to_string().len()
-                            );
-                        }
-                    }
-                }
-            }
-        } else {
-            self.log_print(format!("関数がありません"));
         }
     }
 
@@ -922,23 +888,7 @@ impl<'a> Executor<'a> {
                     }
                 } else {
                     0
-                }] = match value {
-                    Type::String(ref s) => format!("{s}"),
-                    Type::Number(i) => format!("{i}"),
-                    Type::List(l) => format!(
-                        "[{}]",
-                        l.iter()
-                            .map(|x| match x {
-                                Type::Number(i) => i.to_string(),
-                                Type::String(s) => format!("'{s}'"),
-                                Type::List(_) => "".to_string(),
-                                Type::Bool(b) => b.to_string(),
-                            })
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    ),
-                    Type::Bool(b) => b.to_string(),
-                };
+                }] = self.type_string(value);
                 self.memory[address].value = Type::String(vec.join(""));
             }
             _ => {
@@ -1071,243 +1021,23 @@ impl<'a> Executor<'a> {
         elements
     }
 
-    /// 標準ライブラリを呼び出す
-    fn call_stdlib(&mut self, item: String) -> ReturnValue {
-        let params: Vec<&str> = item[..item.len() - 1].split("(").collect();
-        let name = params[0].to_string();
-        let mut args = self.tokenize_arguments(params[1..].join("(").as_str());
-
-        if args.len() == 0 {
-            args.push("".to_string());
-        }
-
-        //　入力
-        if name == "input" {
-            self.log_print(format!("標準ライブラリのinput関数を呼び出します"));
-            return self.input(args[0].clone());
-        }
-
-        //　出力
-        if name == "print" {
-            self.log_print(format!("標準ライブラリのprint関数を呼び出します"));
-            return self.print(args[0].clone());
-        }
-
-        //　現在時刻
-        if name == "time.now" {
-            self.log_print(format!("標準ライブラリのtime.now関数を呼び出します"));
-            return self.time_now();
-        }
-
-        //　スリープ
-        if name == "time.sleep" {
-            self.log_print(format!("標準ライブラリのtime.sleep関数を呼び出します"));
-            return self.time_sleep(args[0].clone());
-        }
-
-        // 参照
-        if name == "ref" {
-            self.log_print(format!("標準ライブラリのref関数を呼び出します"));
-            return self.refer(args[0].clone());
-        }
-
-        //　指定したメモリアドレスにアクセス
-        if name == "access" {
-            self.log_print(format!("標準ライブラリのaccess関数を呼び出します"));
-            return self.access(args[0].clone());
-        }
-
-        // データ型を判定
-        if name == "type" {
-            self.log_print(format!("標準ライブラリのtype関数を呼び出します"));
-            return self.types(args[0].clone());
-        }
-
-        // 文字列に変換
-        if name == "string" {
-            self.log_print(format!("標準ライブラリのstring関数を呼び出します"));
-            return self.string(args[0].clone());
-        }
-
-        // 数値に変換
-        if name == "number" {
-            self.log_print(format!("標準ライブラリのnumber関数を呼び出します"));
-            return self.number(args[0].clone());
-        }
-
-        // 論理値に変換
-        if name == "bool" {
-            self.log_print(format!("標準ライブラリのbool関数を呼び出します"));
-            return self.bool(args[0].clone());
-        }
-
-        // リストを作成
-        if name == "list" {
-            self.log_print(format!("標準ライブラリのlist関数を呼び出します"));
-            return self.list(args.join(",").clone());
-        }
-
-        return ReturnValue::None;
-    }
-
-    ///　ユーザー定義関数を呼び出す
-    fn call_function(&mut self, item: String) -> ReturnValue {
-        if !item.contains("(") {
-            self.log_print("エラー! 関数にはカッコをつけてください".to_string());
-            return ReturnValue::Error("エラー! 関数にはカッコをつけてください".to_string());
-        }
-        let params: Vec<&str> = item[..item.len() - 1].split("(").collect::<Vec<&str>>();
-
-        let func_name: String = params[0].replace(" ", "").replace("　", "").clone();
-
-        self.log_print(format!("引数の値を求めます"));
-
-        let mut args_value = Vec::new();
-
-        for s in self
-            .tokenize_arguments(
-                params[1..]
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join("(")
-                    .as_str(),
-            )
-            .iter()
-        {
-            let computed_value = match self.compute(s.to_string()) {
-                ReturnValue::Some(i) => i,
-                ReturnValue::Error(e) => return ReturnValue::Error(e),
-                _ => return ReturnValue::Error("エラー! 引数の値が不正です".to_string()),
-            };
-            args_value.push(computed_value);
-        }
-
-        let name = func_name
-            .replacen("call", "", 1)
-            .replace(" ", "")
-            .replace("　", "")
-            .replace("(", "")
-            .replace(")", "");
-
-        self.log_print(format!("関数{name}を呼び出します"));
-
-        let code = match self.get_function(name.clone()) {
-            Some(func) => func.code,
-            None => return ReturnValue::None,
-        };
-
-        let function_args = self.get_function(name.clone()).unwrap().args.clone();
-
-        let mut pre = Vec::new();
-
-        for (i, j) in function_args.iter().zip(args_value.iter()) {
-            match j {
-                Type::String(s) => {
-                    pre.push(format!("var {i} = '{s}'")); // 引数は変数として扱われる
-                }
-                Type::Number(f) => pre.push(format!("var {i} = {f}")),
-                Type::List(l) => pre.push(format!(
-                    "var {i} = list({})",
-                    l.iter()
-                        .map(|x| match x {
-                            Type::Number(i) => i.to_string(),
-                            Type::String(s) => format!("'{s}'"),
-                            Type::List(_) => "".to_string(),
-                            Type::Bool(b) => {
-                                b.to_string()
-                            }
-                        })
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )),
-                Type::Bool(b) => {
-                    format!("var {i} = {}", &b.to_string());
-                }
-            }
-        }
-
-        let mut instance = Executor::new(
-            &mut self.memory,
-            &mut self.name_space,
-            ExecutionMode::Script,
-        );
-
-        instance.execute_block(pre);
-        instance.execution_mode = self.execution_mode.clone();
-
-        if let ExecutionMode::Interactive = instance.execution_mode {
-            instance.execution_mode = ExecutionMode::Debug
-        }
-        return instance.execute_block(code);
-    }
-
-    /// 関数を定義する
-    fn set_function(&mut self, item: String, code: Vec<String>) {
-        let new_lines: Vec<String> = item
-            .trim()
-            .replacen("func", "", 1)
-            .replace(")", "")
-            .replace(" ", "")
-            .replace("　", "")
-            .split("(")
-            .map(|s| s.to_string())
-            .collect();
-
-        let func_name: String = new_lines[0].clone();
-
-        let args_value: Vec<String> = new_lines[1].split(',').map(|s| s.to_string()).collect();
-
-        let name = func_name
-            .replace(" ", "")
-            .replace("　", "")
-            .replace("(", "")
-            .replace(")", "");
-
-        let name = name.trim().replace(" ", "").replace("　", "");
-        let is_duplicate = {
-            //関数が既に在るか？
-            let mut flag = false;
-            for item in self.name_space.iter() {
-                if item.name == name.trim().replace(" ", "") {
-                    flag = true;
-                }
-            }
-            flag
-        };
-
-        if is_duplicate {
-            //　関数が在る場合は更新する
-            let address = self.reference_function(func_name.clone()).unwrap_or(0);
-            self.name_space[address].code = code.clone();
-            self.name_space[address].args = args_value.clone();
-            self.log_print(format!("関数データを更新しました"));
-        } else {
-            //ない場合は新規に確保する
-            self.name_space.push(Function {
-                name: name.clone(),
-                args: args_value,
-                code: code,
-            });
-            self.log_print(format!("メモリに関数を保存しました"));
-        }
-    }
-
     /// 関数の参照
-    fn reference_function(&mut self, name: String) -> Option<usize> {
+    pub fn reference_function(&mut self, name: String) -> Option<usize> {
         let name = name
             .trim()
             .replace(" ", "")
             .replace("　", "")
             .replace("(", "")
             .replace(")", "");
-        self.name_space
+        let mut name_space = self.name_space.clone();
+        name_space.reverse();
+        name_space
             .iter()
             .position(|x| x.name == name.trim().replace(" ", ""))
     }
 
     /// 変数の値をセットする
-    fn set_variable(&mut self, name: String, expr: String) -> ReturnValue {
+    pub fn set_variable(&mut self, name: String, value: Type) -> ReturnValue {
         let name = name.trim().replace(" ", "").replace("　", "");
         let is_duplicate = {
             //変数が既に在るか？
@@ -1324,20 +1054,11 @@ impl<'a> Executor<'a> {
             //　変数が在る場合は更新する
             let address = self.reference_variable(name.clone()).unwrap_or(0);
             self.log_print(format!("値を求めます"));
-            self.memory[address].value = match self.compute(expr.clone()) {
-                ReturnValue::Some(i) => i,
-                ReturnValue::Error(e) => return ReturnValue::Error(e),
-                _ => Type::Number(0.0),
-            };
+            self.memory[address].value = value;
             self.log_print(format!("変数データを更新しました"));
         } else {
             //ない場合は新規に確保する
             self.log_print(format!("値を求めます"));
-            let value = match self.compute(expr.clone()) {
-                ReturnValue::Some(i) => i,
-                ReturnValue::Error(e) => return ReturnValue::Error(e),
-                _ => Type::Number(0.0),
-            };
             self.memory.push(Variable {
                 name: name.clone(),
                 value: value,
@@ -1371,19 +1092,7 @@ impl<'a> Executor<'a> {
         }
     }
 
-    /// 関数を取得する
-    fn get_function(&mut self, name: String) -> Option<Function> {
-        let index = match self.reference_function(name.clone()) {
-            Some(i) => i,
-            None => {
-                self.log_print(format!("関数{}が見つかりません", &name));
-                return None;
-            }
-        };
-        return Some(self.name_space[index].clone());
-    }
-
-    /// 型の文字列表記
+    /// データの文字列表記
     pub fn type_string(&mut self, data: Type) -> String {
         match data {
             Type::String(s) => format!("'{s}'"),
@@ -1396,6 +1105,25 @@ impl<'a> Executor<'a> {
                     .join(", ")
             ),
             Type::Bool(b) => b.to_string(),
+            Type::Function(f) => {
+                let func = self.function_propaty(f);
+                let mut text = String::new();
+                text += &format!("| +--  {} ({}) ", func.name, func.args.join(", "));
+                let mut number = 0; //行数
+                for j in func.code.iter() {
+                    if j != "" {
+                        number += 1;
+                        if let ExecutionMode::Script = self.execution_mode {
+                        } else {
+                            text += &format!(
+                                "| | {number:>len$}: {j}",
+                                len = func.code.len().to_string().len()
+                            );
+                        }
+                    }
+                }
+                text
+            }
         }
     }
 
@@ -1476,18 +1204,52 @@ impl<'a> Executor<'a> {
             }
 
             // 関数を呼び出す
-            if item.contains("(") && item.contains(")") {
-                stack.push(match self.call_stdlib(item.to_string()) {
+            if item == "()" {
+                let func = match stack.pop() {
+                    Some(i) => i,
+                    None => return ReturnValue::Error("エラー! スタックが空です".to_string()),
+                };
+
+                // 標準ライブラリ関数呼び出し
+                let value = if let Type::String(name) = func.clone() {
+                    let mut args: Vec<Type> = Vec::new();
+                    let count = self.std_func_args_len(name.clone());
+
+                    for _ in 0..count {
+                        args.push(stack.pop().unwrap());
+                    }
+                    self.call_stdlib(name, args)
+                } else {
+                    // ユーザ定義関数呼び出し
+                    if let Type::Function(pointer) = func {
+                        let mut args: Vec<Type> = Vec::new();
+                        let count = self.function_propaty(pointer).clone().args.len();
+
+                        for _ in 0..count {
+                            args.push(stack.pop().unwrap());
+                        }
+
+                        self.execute_function(pointer, args)
+                    } else {
+                        return ReturnValue::Error(
+                            "エラー! 関数オブジェクトのみ呼び出し可能です".to_string(),
+                        );
+                    }
+                };
+
+                stack.push(match value {
                     ReturnValue::Some(i) => i,
-                    ReturnValue::None => match self.call_function(item.to_string()) {
-                        ReturnValue::Some(i) => i,
-                        ReturnValue::Error(e) => return ReturnValue::Error(e),
-                        _ => Type::Number(0.0),
-                    },
                     ReturnValue::Error(e) => return ReturnValue::Error(e),
                     _ => Type::Number(0.0),
                 });
                 continue;
+            }
+
+            if let Some(variable) = self.get_variable(item.to_string()) {
+                if let Type::Function(pointer) = variable.value {
+                    stack.push(Type::Function(pointer));
+                    continue;
+                }
             }
 
             match item.parse::<f64>() {
@@ -1593,13 +1355,15 @@ impl<'a> Executor<'a> {
                                         "~" => {
                                             stack.push(Type::Number(x));
 
-                                            stack.push(match self.access(y.to_string()) {
-                                                ReturnValue::Some(i) => i,
-                                                ReturnValue::Error(e) => {
-                                                    return ReturnValue::Error(e)
-                                                }
-                                                _ => Type::Number(0.0),
-                                            });
+                                            stack.push(
+                                                match self.access(Type::String(y.to_string())) {
+                                                    ReturnValue::Some(i) => i,
+                                                    ReturnValue::Error(e) => {
+                                                        return ReturnValue::Error(e)
+                                                    }
+                                                    _ => Type::Number(0.0),
+                                                },
+                                            );
                                             continue;
                                         }
                                         _ => {
@@ -1620,15 +1384,15 @@ impl<'a> Executor<'a> {
                                         }
                                     }
                                 }
-                                (Type::List(mut y), Type::List(mut x)) => {
+                                (y, Type::List(mut x)) => {
                                     match item {
                                         "+" => {
-                                            x.append(&mut y);
+                                            x.append(&mut vec![y]);
                                             stack.push(Type::List(x.to_owned()));
                                         }
                                         _ => {
                                             stack.push(Type::List(x));
-                                            stack.push(Type::List(y));
+                                            stack.push(y);
                                             // 文字列として処理する
                                             if item == "true" {
                                                 stack.push(Type::Bool(true));
@@ -1697,7 +1461,7 @@ impl<'a> Executor<'a> {
                                         }
                                     };
 
-                                    stack.push(match self.access(y.to_string()) {
+                                    stack.push(match self.access(Type::String(y.to_string())) {
                                         ReturnValue::Some(i) => i,
                                         ReturnValue::Error(e) => return ReturnValue::Error(e),
                                         _ => Type::Number(0.0),

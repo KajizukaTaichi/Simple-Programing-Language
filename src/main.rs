@@ -3,7 +3,9 @@ use std::fs::File;
 use std::io::{Error, Read};
 
 mod checker; //構文チェッカー
+mod exe_utility;
 mod executor; //実行処理
+mod function_manager;
 mod stdlib; // 標準ライブラリ
 
 /// ファイルを読み込む
